@@ -1,0 +1,999 @@
+#!/usr/bin/env python3
+"""Shared helpers for the Autonomous Project Agent plugin."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+
+PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+TEMPLATE_DIR = PLUGIN_ROOT / "templates"
+REFERENCE_DIR = PLUGIN_ROOT / "references"
+KNOWLEDGE_INDEX_PATH = REFERENCE_DIR / "knowledge-index.json"
+STATE_DIRNAME = ".codex-agent"
+ARTIFACT_FILES = [
+    "ultra-context.md",
+    "context-bundle.md",
+    "discovery-questionnaire.md",
+    "plan-variants.md",
+    "beginner-guide.md",
+    "project-brief.md",
+    "product-intelligence.md",
+    "product-context.md",
+    "tech-context.md",
+    "active-context.md",
+    "progress.md",
+    "implementation-plan.md",
+    "design-direction.md",
+    "data-model.md",
+    "execution-log.md",
+    "verification-report.md",
+    "scorecard.md",
+    "env-secrets-checklist.md",
+    "final-handoff.md",
+    "approval-snapshot.json",
+]
+PLAN_LOCK_FIELDS = [
+    "project_type",
+    "project_archetype",
+    "secondary_archetypes",
+    "capabilities",
+    "selected_stack",
+    "active_roles",
+    "recommended_skills",
+    "selected_packs",
+    "playbook",
+    "supporting_playbooks",
+    "quality_gates",
+    "verification_required",
+    "execution_strategy",
+    "quality_mode",
+]
+REQUIRED_STATE_KEYS = [
+    "project_type",
+    "project_archetype",
+    "secondary_archetypes",
+    "capabilities",
+    "token_mode",
+    "quality_mode",
+    "goal",
+    "audience",
+    "plan_variants",
+    "selected_plan_variant",
+    "beginner_explanation_mode",
+    "phase",
+    "phase_history",
+    "answers",
+    "assumptions",
+    "selected_stack",
+    "active_roles",
+    "recommended_skills",
+    "selected_packs",
+    "playbook",
+    "supporting_playbooks",
+    "quality_gates",
+    "verification_required",
+    "approval_status",
+    "approval_snapshot",
+    "execution_strategy",
+    "scope_mode",
+    "recommendation_policy",
+    "scope_guardrails",
+    "phase_context_targets",
+    "cross_checks",
+    "user_overrides",
+    "tasks",
+    "blocked_on_user",
+    "manual_inputs",
+    "artifacts",
+]
+PHASES = ["discovery", "planning", "approval", "execution", "verification", "handoff"]
+PHASE_INDEX = {phase: index for index, phase in enumerate(PHASES)}
+PROJECT_TYPES = [
+    "landing-page",
+    "saas-mvp",
+    "telegram-ai-bot",
+    "automation-script",
+    "api-integration-worker",
+    "general-web-product",
+]
+PROJECT_TYPE_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("telegram-ai-bot", ("telegram", "bot", "чат-бот", "бот", "assistant", "telegraf")),
+    ("automation-script", ("cron", "script", "sync", "parser", "automation", "cli", "scrape", "worker", "скрипт", "автоматизац", "парсер")),
+    ("api-integration-worker", ("webhook", "integration", "provider", "api", "callback", "endpoint", "интеграц", "вебхук")),
+    ("saas-mvp", ("saas", "dashboard", "cabinet", "auth", "crm", "admin", "кабинет", "дашборд", "авторизац", "админ")),
+    ("landing-page", ("landing", "promo", "marketing site", "website", "site", "лендинг", "сайт")),
+]
+CAPABILITY_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("ai", ("ai", "gpt", "llm", "openai", "assistant", "ии")),
+    ("auth", ("auth", "login", "sign in", "signup", "авторизац", "вход", "регистрац")),
+    ("dashboard", ("dashboard", "cabinet", "admin", "panel", "дашборд", "кабинет", "панель", "админ")),
+    ("database", ("database", "postgres", "supabase", "sql", "база", "таблиц")),
+    ("payments", ("payment", "billing", "stripe", "подписк", "платеж", "оплат")),
+    ("api", ("api", "endpoint", "webhook", "callback", "интеграц", "вебхук")),
+    ("automation", ("automation", "cron", "sync", "worker", "автоматизац", "расписан")),
+    ("telegram", ("telegram", "bot", "telegraf", "телеграм", "бот")),
+    ("marketing", ("landing", "promo", "marketing", "лендинг", "маркетинг")),
+    ("admin-panel", ("admin", "dashboard", "panel", "админ", "панель")),
+]
+CAPABILITY_SKILLS = {
+    "ai": ["openai-docs"],
+    "auth": ["security-best-practices"],
+    "dashboard": ["frontend-skill", "react-best-practices"],
+    "database": ["supabase-postgres-best-practices"],
+    "payments": ["stripe-best-practices"],
+    "api": ["security-best-practices"],
+    "automation": ["playwright"],
+    "marketing": ["frontend-skill", "web-design-guidelines"],
+}
+CAPABILITY_QUALITY_GATES = {
+    "ai": ["prompt-and-fallback-paths-defined"],
+    "auth": ["auth-boundaries"],
+    "dashboard": ["role-specific-empty-and-error-states"],
+    "database": ["data-protection"],
+    "payments": ["payment-flow-sandboxed"],
+    "api": ["input-validation"],
+    "automation": ["dry-run-or-safe-preview"],
+    "marketing": ["clear-cta"],
+}
+CAPABILITY_VERIFICATION = {
+    "ai": ["fallback-response-check"],
+    "auth": ["auth-flow-smoke-test"],
+    "dashboard": ["core-dashboard-route-check"],
+    "database": ["data-flow-check"],
+    "payments": ["sandbox-payment-check"],
+    "api": ["payload-validation-check"],
+    "automation": ["failure-path-check"],
+    "marketing": ["cta-route-check"],
+}
+SCOPE_GUARDRAILS_BASE = [
+    "Не добавляй функции, которые пользователь явно не просил, без отдельного блока рекомендаций.",
+    "В первую версию включай только то, что нужно для одного рабочего сценария.",
+    "Советы по улучшению отделяй от обязательного scope.",
+    "Любое расширение scope после плана требует явного подтверждения пользователя.",
+]
+
+
+def dedupe(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for item in items:
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        ordered.append(item)
+    return ordered
+
+
+def state_dir(workspace: Path) -> Path:
+    return workspace / STATE_DIRNAME
+
+
+def state_path(workspace: Path) -> Path:
+    return state_dir(workspace) / "state.json"
+
+
+def approval_snapshot_path(workspace: Path) -> Path:
+    return state_dir(workspace) / "approval-snapshot.json"
+
+
+def artifact_paths(_: Path) -> dict[str, str]:
+    return {name: str(Path(STATE_DIRNAME) / name) for name in ARTIFACT_FILES}
+
+
+def template_path(name: str) -> Path:
+    return TEMPLATE_DIR / name
+
+
+def read_template(name: str) -> str:
+    return template_path(name).read_text(encoding="utf-8")
+
+
+def load_knowledge_index() -> dict[str, Any]:
+    return json.loads(KNOWLEDGE_INDEX_PATH.read_text(encoding="utf-8"))
+
+
+def path_from_plugin_relative(path: str) -> Path:
+    normalized = path[2:] if path.startswith("./") else path
+    return PLUGIN_ROOT / normalized
+
+
+def _project_match_scores(text: str) -> list[tuple[str, int]]:
+    scores: list[tuple[str, int]] = []
+    for project_type, tokens in PROJECT_TYPE_RULES:
+        score = sum(1 for token in tokens if token in text)
+        if score > 0:
+            scores.append((project_type, score))
+    return scores
+
+
+def infer_project_profile(
+    idea: str,
+    explicit: str | None = None,
+    existing_secondary: list[str] | None = None,
+    existing_capabilities: list[str] | None = None,
+) -> dict[str, list[str] | str]:
+    text = (idea or "").lower()
+    matches = _project_match_scores(text)
+    sorted_matches = sorted(matches, key=lambda item: (-item[1], PROJECT_TYPES.index(item[0])))
+
+    if explicit:
+        primary = explicit
+    elif any(token in text for token in ("telegram", "телеграм", "telegraf")) and any(token in text for token in ("bot", "бот", "чат-бот")):
+        primary = "telegram-ai-bot"
+    elif sorted_matches:
+        primary = sorted_matches[0][0]
+    else:
+        primary = "general-web-product"
+
+    secondary = dedupe(
+        (existing_secondary or [])
+        + [project_type for project_type, _score in sorted_matches if project_type != primary]
+    )[:3]
+
+    detected_capabilities = [capability for capability, tokens in CAPABILITY_RULES if any(token in text for token in tokens)]
+    if primary == "telegram-ai-bot":
+        detected_capabilities.append("telegram")
+    if primary == "landing-page":
+        detected_capabilities.append("marketing")
+    if primary == "automation-script":
+        detected_capabilities.append("automation")
+    if primary == "api-integration-worker":
+        detected_capabilities.extend(["api", "automation"])
+    if primary == "saas-mvp":
+        detected_capabilities.extend(["dashboard", "auth"])
+    if secondary and any(item in {"saas-mvp", "general-web-product", "landing-page"} for item in secondary):
+        detected_capabilities.append("dashboard")
+
+    capabilities = dedupe((existing_capabilities or []) + detected_capabilities)
+    return {
+        "primary": primary,
+        "secondary_archetypes": secondary,
+        "capabilities": capabilities,
+    }
+
+
+def infer_project_type(idea: str, explicit: str | None = None) -> str:
+    return str(infer_project_profile(idea, explicit)["primary"])
+
+
+def stack_for_project_type(project_type: str) -> dict[str, Any]:
+    matrix: dict[str, dict[str, Any]] = {
+        "landing-page": {
+            "framework": "Astro",
+            "ui_strategy": "custom-sections-first",
+            "component_library": "minimal-forms-and-dialogs-only",
+            "database": "none-unless-real-data-is-needed",
+        },
+        "saas-mvp": {
+            "framework": "Next.js",
+            "ui_strategy": "shadcn-ui-primitives-with-custom-visual-layer",
+            "database": "Supabase/Postgres-when-data-or-auth-is-real",
+            "auth": "required-when-user-accounts-exist",
+        },
+        "telegram-ai-bot": {
+            "runtime": "Node.js",
+            "bot_framework": "Telegraf",
+            "http_layer": "Hono",
+            "database": "Supabase/Postgres-when-user-state-or-history-is-real",
+            "navigation_pattern": "single-message-inline-navigation",
+        },
+        "automation-script": {
+            "runtime": "Python",
+            "execution_mode": "cli-or-scheduled-task",
+            "database": "none-unless-durable-state-is-real",
+            "safety": "dry-run-first-when-side-effects-exist",
+        },
+        "api-integration-worker": {
+            "runtime": "Node.js",
+            "server_layer": "Hono-or-repo-native-equivalent",
+            "database": "optional-when-durable-state-or-dedup-is-needed",
+            "safety": "retry-backoff-and-idempotency-aware",
+        },
+        "general-web-product": {
+            "framework": "Next.js",
+            "ui_strategy": "custom-ui-with-focused-primitives",
+            "database": "optional",
+        },
+    }
+    return matrix.get(project_type, matrix["general-web-product"]).copy()
+
+
+def stack_for_project_profile(project_type: str, capabilities: list[str]) -> dict[str, Any]:
+    stack = stack_for_project_type(project_type)
+    capability_set = set(capabilities)
+    if "ai" in capability_set:
+        stack.setdefault("ai_provider", "OpenAI-compatible")
+    if "auth" in capability_set and "auth" not in stack:
+        stack["auth"] = "required-for-protected-routes"
+    if "database" in capability_set and stack.get("database") == "optional":
+        stack["database"] = "recommended-because-capability-requires-state"
+    if "dashboard" in capability_set and project_type in {"telegram-ai-bot", "automation-script", "api-integration-worker"}:
+        stack["operator_ui"] = "web-dashboard-if-operator-workflow-is-real"
+    if "payments" in capability_set:
+        stack["payments"] = "Stripe-or-repo-native-provider"
+    return stack
+
+
+def roles_for_project_type(project_type: str) -> list[str]:
+    base_roles = [
+        "project-discovery",
+        "solution-architect",
+        "design-director",
+        "qa-reviewer",
+        "deploy-operator",
+    ]
+    matrix = {
+        "landing-page": ["frontend-builder"],
+        "saas-mvp": ["frontend-builder", "backend-builder", "database-designer"],
+        "telegram-ai-bot": ["backend-builder", "database-designer"],
+        "automation-script": ["automation-builder"],
+        "api-integration-worker": ["backend-builder", "automation-builder", "database-designer"],
+        "general-web-product": ["frontend-builder", "backend-builder"],
+    }
+    return base_roles + matrix.get(project_type, matrix["general-web-product"])
+
+
+def roles_for_project_profile(project_type: str, secondary_archetypes: list[str], capabilities: list[str]) -> list[str]:
+    roles = roles_for_project_type(project_type)
+    if any(item in {"saas-mvp", "general-web-product", "landing-page"} for item in secondary_archetypes):
+        roles.append("frontend-builder")
+    if any(item in {"telegram-ai-bot", "api-integration-worker"} for item in secondary_archetypes):
+        roles.append("backend-builder")
+    if "database" in capabilities or "auth" in capabilities or "payments" in capabilities:
+        roles.append("database-designer")
+    if "dashboard" in capabilities:
+        roles.append("frontend-builder")
+    if "automation" in capabilities:
+        roles.append("automation-builder")
+    return dedupe(roles)
+
+
+def select_pack_ids(project_type: str, phase: str, secondary_archetypes: list[str] | None = None, capabilities: list[str] | None = None) -> list[str]:
+    index = load_knowledge_index()
+    applicable_types = {project_type, *(secondary_archetypes or [])}
+    selected: list[str] = []
+    for pack in index.get("packs", []):
+        pack_types = set(pack.get("project_types", []))
+        pack_phases = set(pack.get("phases", []))
+        if not applicable_types.intersection(pack_types):
+            continue
+        if pack_phases and phase not in pack_phases:
+            continue
+        required_capabilities = set(pack.get("capabilities", []))
+        if required_capabilities and not required_capabilities.intersection(set(capabilities or [])):
+            continue
+        selected.append(pack["id"])
+    return dedupe(selected)
+
+
+def recommended_skills_for_project_type(project_type: str, secondary_archetypes: list[str] | None = None, capabilities: list[str] | None = None) -> list[str]:
+    index = load_knowledge_index()
+    skills = list(index.get("recommended_skills", {}).get(project_type, []))
+    for archetype in secondary_archetypes or []:
+        skills.extend(index.get("recommended_skills", {}).get(archetype, []))
+    for capability in capabilities or []:
+        skills.extend(CAPABILITY_SKILLS.get(capability, []))
+    return dedupe(skills)
+
+
+def quality_gates_for_project_type(project_type: str, secondary_archetypes: list[str] | None = None, capabilities: list[str] | None = None) -> list[str]:
+    index = load_knowledge_index()
+    gates = list(index.get("quality_gates", {}).get(project_type, []))
+    for archetype in secondary_archetypes or []:
+        gates.extend(index.get("quality_gates", {}).get(archetype, []))
+    for capability in capabilities or []:
+        gates.extend(CAPABILITY_QUALITY_GATES.get(capability, []))
+    return dedupe(gates)
+
+
+def verification_required_for_project_type(project_type: str, secondary_archetypes: list[str] | None = None, capabilities: list[str] | None = None) -> list[str]:
+    verification_matrix = {
+        "landing-page": ["desktop-ui-review", "mobile-ui-review", "cta-route-check", "seo-metadata-check"],
+        "saas-mvp": ["auth-flow-smoke-test", "permissions-review", "data-flow-check", "env-audit"],
+        "telegram-ai-bot": ["manual-telegram-walkthrough", "callback-flow-check", "secret-audit", "webhook-readiness"],
+        "automation-script": ["dry-run-check", "logs-review", "failure-path-check", "env-audit"],
+        "api-integration-worker": ["payload-validation-check", "retry-policy-check", "idempotency-check", "provider-secret-audit"],
+        "general-web-product": ["core-flow-smoke-test", "mobile-ui-review", "env-audit"],
+    }
+    items = list(verification_matrix.get(project_type, verification_matrix["general-web-product"]))
+    for archetype in secondary_archetypes or []:
+        items.extend(verification_matrix.get(archetype, []))
+    for capability in capabilities or []:
+        items.extend(CAPABILITY_VERIFICATION.get(capability, []))
+    return dedupe(items)
+
+
+def playbook_for_project_type(project_type: str) -> str:
+    index = load_knowledge_index()
+    return index.get("playbooks", {}).get(project_type, "./playbooks/saas-mvp.md")
+
+
+def supporting_playbooks_for_types(secondary_archetypes: list[str]) -> list[str]:
+    index = load_knowledge_index()
+    return dedupe(
+        [index.get("playbooks", {}).get(archetype, "") for archetype in secondary_archetypes if index.get("playbooks", {}).get(archetype, "")]
+    )
+
+
+def execution_strategy_for_project_type(project_type: str, secondary_archetypes: list[str] | None = None, capabilities: list[str] | None = None) -> str:
+    if secondary_archetypes:
+        return "составной-проект-с-поэтапной-сборкой-и-замороженным-планом"
+    if project_type in {"telegram-ai-bot", "automation-script", "api-integration-worker"}:
+        return "последовательные-роли-с-guardrails-на-надежность"
+    if "payments" in set(capabilities or []) or "auth" in set(capabilities or []):
+        return "последовательные-роли-с-guardrails-на-доступ-и-данные"
+    return "последовательные-роли-с-дизайн-и-smoke-gates"
+
+
+def scope_mode_for_project_type(project_type: str, quality_mode: str = "сбалансированно") -> str:
+    if quality_mode == "быстро":
+        return "жесткий-mvp"
+    if project_type in {"telegram-ai-bot", "automation-script", "api-integration-worker"}:
+        return "один-главный-сценарий-и-минимум-лишнего"
+    return "mvp-с-отдельным-блоком-рекомендаций"
+
+
+def recommendation_policy_for_project_type(project_type: str) -> str:
+    if project_type in {"landing-page", "general-web-product"}:
+        return "советуй-улучшения-отдельно-от-MVP-и-не-включай-их-в-первую-реализацию-без-подтверждения"
+    return "предлагай-усиления-как-отложенные-идеи-и-не-реализуй-их-молча"
+
+
+def scope_guardrails_for_project_type(project_type: str, capabilities: list[str] | None = None) -> list[str]:
+    guardrails = list(SCOPE_GUARDRAILS_BASE)
+    if project_type == "saas-mvp":
+        guardrails.append("Не добавляй auth, billing, роли и админку одновременно, если главный сценарий можно проверить без этого.")
+    if project_type == "telegram-ai-bot":
+        guardrails.append("Не добавляй базу, AI, админку и панель операторов одновременно, если бот можно запустить без них.")
+    if project_type == "landing-page":
+        guardrails.append("Не превращай лендинг в мини-CMS или SaaS без отдельного решения пользователя.")
+    if "payments" in set(capabilities or []):
+        guardrails.append("Платежи не должны тянуть за собой лишнюю инфраструктуру, если можно начать с sandbox-сценария.")
+    return dedupe(guardrails)
+
+
+def default_plan_variants(project_type: str, capabilities: list[str] | None = None) -> list[dict[str, Any]]:
+    capability_set = set(capabilities or [])
+    minimal_focus = "один главный рабочий сценарий"
+    optimal_focus = "основной сценарий плюс базовая надежность и понятный UX"
+    buffer_focus = "основной сценарий плюс 1-2 заранее полезных улучшения без расползания в большой продукт"
+
+    if project_type == "telegram-ai-bot":
+        minimal_focus = "одно меню, один маршрут пользователя и минимальный набор команд"
+        optimal_focus = "одно меню, устойчивые callback-сценарии, базовые проверки и готовность к webhook"
+        buffer_focus = "оптимальный вариант плюс 1 полезное улучшение, например AI-ответы или простое хранение состояния"
+    elif project_type == "landing-page":
+        minimal_focus = "один продающий сценарий с понятным CTA"
+        optimal_focus = "продающий сценарий, мобильная полировка и базовое SEO"
+        buffer_focus = "оптимальный вариант плюс 1-2 усиления, например анимации или улучшенная форма"
+    elif project_type == "saas-mvp":
+        minimal_focus = "один ключевой сценарий в кабинете без лишних подсистем"
+        optimal_focus = "ключевой сценарий, базовые данные, права доступа и понятные состояния интерфейса"
+        buffer_focus = "оптимальный вариант плюс 1 оправданное усиление, например простая аналитика или роли"
+    elif project_type in {"automation-script", "api-integration-worker"}:
+        minimal_focus = "один рабочий pipeline без лишней инфраструктуры"
+        optimal_focus = "рабочий pipeline, логирование, dry-run или retry-поведение"
+        buffer_focus = "оптимальный вариант плюс 1 заранее полезное улучшение, например уведомления или дедупликация"
+
+    if "payments" in capability_set:
+        buffer_focus += "; платежи только в sandbox-режиме"
+
+    return [
+        {
+            "id": "минимум",
+            "title": "Минимум",
+            "summary": minimal_focus,
+            "when_to_choose": "Когда важно как можно быстрее запустить первую рабочую версию.",
+        },
+        {
+            "id": "оптимально",
+            "title": "Оптимально",
+            "summary": optimal_focus,
+            "when_to_choose": "Когда нужен лучший баланс скорости, понятности и качества.",
+        },
+        {
+            "id": "с-запасом",
+            "title": "С запасом",
+            "summary": buffer_focus,
+            "when_to_choose": "Когда можно добавить 1-2 заранее полезных улучшения, но не уходить в переусложнение.",
+        },
+    ]
+
+
+def cross_checks_for_project_type(project_type: str, secondary_archetypes: list[str] | None = None, capabilities: list[str] | None = None) -> list[str]:
+    matrix = {
+        "landing-page": [
+            "solution-architect -> design-director: структура не расползается",
+            "design-director -> frontend-builder: визуальное направление не стало generic",
+            "qa-reviewer -> deploy-operator: mobile и CTA проверены до handoff",
+        ],
+        "saas-mvp": [
+            "solution-architect -> database-designer: данные и права доступа согласованы",
+            "backend-builder -> frontend-builder: UI не опирается на несуществующий API",
+            "database-designer -> qa-reviewer: ownership и защита данных проверены",
+        ],
+        "telegram-ai-bot": [
+            "solution-architect -> backend-builder: маршрут пользователя и callback-логика совпадают",
+            "backend-builder -> qa-reviewer: single-message navigation не ломает ручной сценарий",
+            "deploy-operator -> qa-reviewer: webhook и секреты готовы к публикации",
+        ],
+        "automation-script": [
+            "solution-architect -> automation-builder: входы и выходы описаны явно",
+            "automation-builder -> qa-reviewer: dry-run и логи действительно работают",
+            "deploy-operator -> qa-reviewer: env и запуск по расписанию документированы",
+        ],
+        "api-integration-worker": [
+            "solution-architect -> backend-builder: контракты внешнего API описаны",
+            "backend-builder -> automation-builder: retry и idempotency не конфликтуют",
+            "qa-reviewer -> deploy-operator: provider secrets и verification route задокументированы",
+        ],
+        "general-web-product": [
+            "solution-architect -> frontend-builder: зона ответственности frontend и backend разделена",
+            "backend-builder -> frontend-builder: UI не опирается на выдуманную серверную логику",
+            "qa-reviewer -> deploy-operator: основные сценарии и env подтверждены",
+        ],
+    }
+    checks = list(matrix.get(project_type, matrix["general-web-product"]))
+    if "auth" in set(capabilities or []) or "database" in set(capabilities or []):
+        checks.append("database-designer -> deploy-operator: правила доступа и env по данным согласованы")
+    if secondary_archetypes:
+        checks.append("autonomous-project-orchestrator -> все роли: вторичные архетипы не потеряны при реализации")
+    return dedupe(checks)
+
+
+def phase_context_targets(phase: str, token_mode: str = "ultra") -> list[str]:
+    if token_mode == "ultra":
+        matrix = {
+            "discovery": [
+                "ultra-context.md",
+                "context-bundle.md",
+                "discovery-questionnaire.md",
+                "state.json",
+            ],
+            "planning": [
+                "ultra-context.md",
+                "context-bundle.md",
+                "project-brief.md",
+                "product-intelligence.md",
+                "state.json",
+            ],
+            "approval": [
+                "ultra-context.md",
+                "context-bundle.md",
+                "implementation-plan.md",
+                "design-direction.md",
+                "state.json",
+            ],
+            "execution": [
+                "ultra-context.md",
+                "context-bundle.md",
+                "implementation-plan.md",
+                "active-context.md",
+                "state.json",
+            ],
+            "verification": [
+                "ultra-context.md",
+                "context-bundle.md",
+                "implementation-plan.md",
+                "verification-report.md",
+                "state.json",
+            ],
+            "handoff": [
+                "ultra-context.md",
+                "context-bundle.md",
+                "verification-report.md",
+                "env-secrets-checklist.md",
+                "state.json",
+            ],
+        }
+        return matrix.get(phase, matrix["discovery"])
+
+    matrix = {
+        "discovery": [
+            "context-bundle.md",
+            "discovery-questionnaire.md",
+            "project-brief.md",
+            "product-intelligence.md",
+            "state.json",
+        ],
+        "planning": [
+            "context-bundle.md",
+            "project-brief.md",
+            "product-intelligence.md",
+            "product-context.md",
+            "tech-context.md",
+            "state.json",
+        ],
+        "approval": [
+            "context-bundle.md",
+            "implementation-plan.md",
+            "design-direction.md",
+            "state.json",
+        ],
+        "execution": [
+            "context-bundle.md",
+            "implementation-plan.md",
+            "active-context.md",
+            "progress.md",
+            "state.json",
+        ],
+        "verification": [
+            "context-bundle.md",
+            "implementation-plan.md",
+            "execution-log.md",
+            "verification-report.md",
+            "state.json",
+        ],
+        "handoff": [
+            "context-bundle.md",
+            "verification-report.md",
+            "scorecard.md",
+            "env-secrets-checklist.md",
+            "state.json",
+        ],
+    }
+    return matrix.get(phase, matrix["discovery"])
+
+
+def _task_status_for_phase(task_id: str, phase: str) -> str:
+    if task_id == phase:
+        return "in_progress"
+    if PHASE_INDEX.get(task_id, -1) < PHASE_INDEX.get(phase, 0):
+        return "done"
+    return "pending"
+
+
+def merge_tasks(existing_tasks: list[dict[str, str]] | None, defaults: list[dict[str, str]]) -> list[dict[str, str]]:
+    existing_by_id = {task.get("id"): task for task in existing_tasks or [] if task.get("id")}
+    merged: list[dict[str, str]] = []
+    for task in defaults:
+        existing = existing_by_id.get(task["id"], {})
+        status = task["status"]
+        if existing.get("status") == "done" and status == "pending":
+            status = "done"
+        merged.append(
+            {
+                "id": task["id"],
+                "title": task["title"],
+                "owner": existing.get("owner", task["owner"]),
+                "status": status,
+            }
+        )
+    return merged
+
+
+def default_tasks(project_type: str, phase: str) -> list[dict[str, str]]:
+    execution_owner = {
+        "telegram-ai-bot": "backend-builder",
+        "automation-script": "automation-builder",
+        "api-integration-worker": "automation-builder",
+    }.get(project_type, "frontend-builder")
+    tasks = [
+        {
+            "id": "discovery",
+            "title": "Провести понятный discovery-квиз и зафиксировать scope первой версии",
+            "owner": "project-discovery",
+            "status": _task_status_for_phase("discovery", phase),
+        },
+        {
+            "id": "planning",
+            "title": "Собрать план реализации, выбрать knowledge packs и зафиксировать маршрут",
+            "owner": "solution-architect",
+            "status": _task_status_for_phase("planning", phase),
+        },
+        {
+            "id": "approval",
+            "title": "Получить одно явное подтверждение плана до начала продуктовых правок",
+            "owner": "autonomous-project-orchestrator",
+            "status": _task_status_for_phase("approval", phase),
+        },
+        {
+            "id": "execution",
+            "title": f"Реализовать MVP типа {project_type} по выбранному маршруту",
+            "owner": execution_owner,
+            "status": _task_status_for_phase("execution", phase),
+        },
+        {
+            "id": "verification",
+            "title": "Провести QA-проверку и пройти критерии качества",
+            "owner": "qa-reviewer",
+            "status": _task_status_for_phase("verification", phase),
+        },
+        {
+            "id": "handoff",
+            "title": "Подготовить отчёт по проверке, чеклист секретов и финальный handoff",
+            "owner": "deploy-operator",
+            "status": _task_status_for_phase("handoff", phase),
+        },
+    ]
+    return tasks
+
+
+def default_approval_snapshot(workspace: Path) -> dict[str, Any]:
+    return {
+        "locked": False,
+        "artifact": str(Path(STATE_DIRNAME) / "approval-snapshot.json"),
+        "locked_fields": list(PLAN_LOCK_FIELDS),
+    }
+
+
+def default_state(
+    project_type: str,
+    secondary_archetypes: list[str],
+    capabilities: list[str],
+    goal: str,
+    audience: str,
+    phase: str,
+) -> dict[str, Any]:
+    token_mode = "ultra"
+    selected_packs = select_pack_ids(project_type, phase, secondary_archetypes, capabilities)
+    state: dict[str, Any] = {
+        "project_type": project_type,
+        "project_archetype": project_type,
+        "secondary_archetypes": secondary_archetypes,
+        "capabilities": capabilities,
+        "token_mode": token_mode,
+        "quality_mode": "сбалансированно",
+        "goal": goal,
+        "audience": audience,
+        "plan_variants": default_plan_variants(project_type, capabilities),
+        "selected_plan_variant": "оптимально",
+        "beginner_explanation_mode": "включен",
+        "phase": phase,
+        "phase_history": [phase],
+        "answers": {},
+        "assumptions": [],
+        "selected_stack": stack_for_project_profile(project_type, capabilities),
+        "active_roles": roles_for_project_profile(project_type, secondary_archetypes, capabilities),
+        "recommended_skills": recommended_skills_for_project_type(project_type, secondary_archetypes, capabilities),
+        "selected_packs": selected_packs,
+        "playbook": playbook_for_project_type(project_type),
+        "supporting_playbooks": supporting_playbooks_for_types(secondary_archetypes),
+        "quality_gates": quality_gates_for_project_type(project_type, secondary_archetypes, capabilities),
+        "verification_required": verification_required_for_project_type(project_type, secondary_archetypes, capabilities),
+        "approval_status": "pending" if phase in {"discovery", "planning", "approval"} else "approved",
+        "approval_snapshot": default_approval_snapshot(Path(".")),
+        "execution_strategy": execution_strategy_for_project_type(project_type, secondary_archetypes, capabilities),
+        "scope_mode": scope_mode_for_project_type(project_type),
+        "recommendation_policy": recommendation_policy_for_project_type(project_type),
+        "scope_guardrails": scope_guardrails_for_project_type(project_type, capabilities),
+        "phase_context_targets": phase_context_targets(phase, token_mode),
+        "cross_checks": cross_checks_for_project_type(project_type, secondary_archetypes, capabilities),
+        "user_overrides": {},
+        "tasks": default_tasks(project_type, phase),
+        "blocked_on_user": False,
+        "manual_inputs": [],
+        "artifacts": artifact_paths(Path(".")),
+    }
+    return state
+
+
+def load_state(workspace: Path) -> dict[str, Any]:
+    return json.loads(state_path(workspace).read_text(encoding="utf-8"))
+
+
+def save_state(workspace: Path, state: dict[str, Any]) -> None:
+    path = state_path(workspace)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def read_approval_snapshot(workspace: Path) -> dict[str, Any]:
+    path = approval_snapshot_path(workspace)
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def freeze_approval_snapshot(workspace: Path, state: dict[str, Any]) -> dict[str, Any]:
+    snapshot = {
+        "locked": True,
+        "project_type": state.get("project_type"),
+        "project_archetype": state.get("project_archetype"),
+        "secondary_archetypes": state.get("secondary_archetypes", []),
+        "capabilities": state.get("capabilities", []),
+        "selected_stack": state.get("selected_stack", {}),
+        "active_roles": state.get("active_roles", []),
+        "recommended_skills": state.get("recommended_skills", []),
+        "selected_packs": state.get("selected_packs", []),
+        "playbook": state.get("playbook", ""),
+        "supporting_playbooks": state.get("supporting_playbooks", []),
+        "quality_gates": state.get("quality_gates", []),
+        "verification_required": state.get("verification_required", []),
+        "execution_strategy": state.get("execution_strategy", ""),
+        "quality_mode": state.get("quality_mode", "сбалансированно"),
+        "goal": state.get("goal", ""),
+        "locked_fields": list(PLAN_LOCK_FIELDS),
+    }
+    path = approval_snapshot_path(workspace)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    state["approval_snapshot"] = {
+        "locked": True,
+        "artifact": str(Path(STATE_DIRNAME) / "approval-snapshot.json"),
+        "locked_fields": list(PLAN_LOCK_FIELDS),
+    }
+    state["approval_status"] = "approved"
+    return snapshot
+
+
+def merge_state_defaults(
+    state: dict[str, Any],
+    workspace: Path,
+    *,
+    goal: str = "",
+    audience: str = "",
+    project_type: str = "",
+    phase: str = "",
+) -> dict[str, Any]:
+    profile = infer_project_profile(
+        goal or state.get("goal", ""),
+        project_type or state.get("project_type") or None,
+        state.get("secondary_archetypes", []),
+        state.get("capabilities", []),
+    )
+    resolved_project_type = str(profile["primary"])
+    resolved_secondary = list(profile["secondary_archetypes"])
+    resolved_capabilities = list(profile["capabilities"])
+    resolved_phase = phase or state.get("phase", "discovery")
+    resolved_goal = goal or state.get("goal", "")
+    resolved_audience = audience or state.get("audience", "")
+
+    merged = {
+        **default_state(
+            resolved_project_type,
+            resolved_secondary,
+            resolved_capabilities,
+            resolved_goal,
+            resolved_audience,
+            resolved_phase,
+        ),
+        **state,
+    }
+
+    if goal:
+        merged["goal"] = goal
+    if audience:
+        merged["audience"] = audience
+    if phase:
+        merged["phase"] = phase
+    if project_type:
+        merged["project_type"] = project_type
+
+    profile = infer_project_profile(
+        merged.get("goal", ""),
+        merged.get("project_type"),
+        merged.get("secondary_archetypes", []),
+        merged.get("capabilities", []),
+    )
+    merged["project_type"] = str(profile["primary"])
+    merged["project_archetype"] = merged["project_type"]
+    merged["secondary_archetypes"] = list(profile["secondary_archetypes"])
+    merged["capabilities"] = list(profile["capabilities"])
+
+    user_overrides = merged.get("user_overrides", {})
+    if not isinstance(user_overrides, dict):
+        user_overrides = {}
+    merged["user_overrides"] = user_overrides
+
+    snapshot_meta = merged.get("approval_snapshot", {})
+    if not isinstance(snapshot_meta, dict):
+        snapshot_meta = {}
+    snapshot_data = read_approval_snapshot(workspace)
+    snapshot_locked = bool(snapshot_meta.get("locked")) or bool(snapshot_data.get("locked"))
+
+    resolved_plan_fields: dict[str, Any] = {
+        "selected_stack": stack_for_project_profile(merged["project_type"], merged["capabilities"]),
+        "active_roles": roles_for_project_profile(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
+        "recommended_skills": recommended_skills_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
+        "selected_packs": select_pack_ids(merged["project_type"], merged["phase"], merged["secondary_archetypes"], merged["capabilities"]),
+        "playbook": playbook_for_project_type(merged["project_type"]),
+        "supporting_playbooks": supporting_playbooks_for_types(merged["secondary_archetypes"]),
+        "quality_gates": quality_gates_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
+        "verification_required": verification_required_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
+        "execution_strategy": execution_strategy_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
+        "quality_mode": merged.get("quality_mode", "сбалансированно"),
+        "scope_mode": scope_mode_for_project_type(merged["project_type"], merged.get("quality_mode", "сбалансированно")),
+        "recommendation_policy": recommendation_policy_for_project_type(merged["project_type"]),
+        "scope_guardrails": scope_guardrails_for_project_type(merged["project_type"], merged["capabilities"]),
+        "plan_variants": default_plan_variants(merged["project_type"], merged["capabilities"]),
+        "selected_plan_variant": merged.get("selected_plan_variant", "оптимально"),
+        "beginner_explanation_mode": merged.get("beginner_explanation_mode", "включен"),
+    }
+
+    for field, default_value in resolved_plan_fields.items():
+        if field in user_overrides:
+            merged[field] = user_overrides[field]
+            continue
+        if snapshot_locked and field in snapshot_data:
+            merged[field] = snapshot_data[field]
+            continue
+        merged[field] = default_value
+
+    merged["token_mode"] = user_overrides.get("token_mode", merged.get("token_mode", "ultra"))
+    merged["phase_context_targets"] = phase_context_targets(merged["phase"], merged["token_mode"])
+    merged["cross_checks"] = user_overrides.get(
+        "cross_checks",
+        cross_checks_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
+    )
+    merged["approval_status"] = (
+        "approved"
+        if snapshot_locked
+        else "pending"
+        if merged["phase"] in {"discovery", "planning", "approval"} and merged.get("approval_status") != "revision_requested"
+        else merged.get("approval_status", "approved")
+    )
+    merged["approval_snapshot"] = {
+        "locked": snapshot_locked,
+        "artifact": str(Path(STATE_DIRNAME) / "approval-snapshot.json"),
+        "locked_fields": list(PLAN_LOCK_FIELDS),
+    }
+    merged["tasks"] = merge_tasks(state.get("tasks", []), default_tasks(merged["project_type"], merged["phase"]))
+
+    phase_history = [item for item in state.get("phase_history", []) if isinstance(item, str)]
+    if not phase_history:
+        phase_history = [merged["phase"]]
+    elif phase_history[-1] != merged["phase"]:
+        phase_history.append(merged["phase"])
+    merged["phase_history"] = phase_history
+
+    existing_artifacts = state.get("artifacts", {})
+    if isinstance(existing_artifacts, dict):
+        merged["artifacts"] = {
+            **artifact_paths(workspace),
+            **existing_artifacts,
+        }
+    else:
+        merged["artifacts"] = artifact_paths(workspace)
+    return merged
+
+
+def can_transition_phase(current_phase: str, next_phase: str, *, force: bool = False) -> bool:
+    if force or current_phase == next_phase:
+        return True
+    allowed = {
+        "discovery": {"planning"},
+        "planning": {"approval", "discovery"},
+        "approval": {"planning", "execution"},
+        "execution": {"verification", "approval"},
+        "verification": {"execution", "handoff"},
+        "handoff": {"verification"},
+    }
+    return next_phase in allowed.get(current_phase, set())
+
+
+def has_meaningful_content(text: str) -> bool:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    meaningful = [
+        line
+        for line in lines
+        if not line.startswith("#")
+        and not line.startswith("| ---")
+        and not line.startswith("<!--")
+        and not line.startswith("[")
+        and line not in {"{}", "[]"}
+    ]
+    return len(" ".join(meaningful)) >= 40
+
+
+def is_template_content(path: Path, template_name: str) -> bool:
+    if not path.exists():
+        return False
+    return path.read_text(encoding="utf-8").strip() == read_template(template_name).strip()
+
+
+def extract_summary_from_markdown(path: Path, *, fallback: str) -> str:
+    if not path.exists():
+        return fallback
+    lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines()]
+    for line in lines:
+        if not line or line.startswith("#") or line.startswith("- ") or line.startswith("## "):
+            continue
+        return line
+    return fallback

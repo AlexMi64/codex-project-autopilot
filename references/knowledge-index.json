@@ -1,0 +1,108 @@
+{
+  "packs": [
+    {
+      "id": "memory-bank",
+      "title": "Банк памяти",
+      "path": "./references/vibecode/memory-bank.md",
+      "project_types": ["landing-page", "saas-mvp", "telegram-ai-bot", "automation-script", "api-integration-worker", "general-web-product"],
+      "phases": ["discovery", "planning", "execution", "verification", "handoff"],
+      "risks": ["context-loss", "handoff-gaps"]
+    },
+    {
+      "id": "anti-big-bang",
+      "title": "Архитектура без big-bang подхода",
+      "path": "./references/vibecode/anti-big-bang.md",
+      "project_types": ["landing-page", "saas-mvp", "telegram-ai-bot", "automation-script", "api-integration-worker", "general-web-product"],
+      "phases": ["planning", "execution"],
+      "risks": ["scope-creep", "architecture-confusion"]
+    },
+    {
+      "id": "responsibility-map",
+      "title": "Карта ответственности",
+      "path": "./references/vibecode/responsibility-map.md",
+      "project_types": ["saas-mvp", "telegram-ai-bot", "api-integration-worker", "general-web-product"],
+      "phases": ["discovery", "planning", "execution"],
+      "risks": ["layer-confusion"]
+    },
+    {
+      "id": "single-message-telegram-navigation",
+      "title": "Навигация Telegram-бота в одном сообщении",
+      "path": "./references/vibecode/single-message-telegram-navigation.md",
+      "project_types": ["telegram-ai-bot"],
+      "phases": ["planning", "execution", "verification"],
+      "risks": ["chat-spam", "callback-ux"]
+    },
+    {
+      "id": "beginner-security-checklist",
+      "title": "Базовый чеклист безопасности для новичка",
+      "path": "./references/vibecode/beginner-security-checklist.md",
+      "project_types": ["saas-mvp", "telegram-ai-bot", "automation-script", "api-integration-worker", "general-web-product"],
+      "phases": ["planning", "execution", "verification", "handoff"],
+      "risks": ["data-leak", "secret-exposure", "weak-auth"]
+    },
+    {
+      "id": "minimum-observability",
+      "title": "Минимальная наблюдаемость",
+      "path": "./references/vibecode/minimum-observability.md",
+      "project_types": ["saas-mvp", "telegram-ai-bot", "automation-script", "api-integration-worker", "general-web-product"],
+      "phases": ["execution", "verification", "handoff"],
+      "risks": ["blind-debugging", "failed-handoff"]
+    },
+    {
+      "id": "staged-design-process",
+      "title": "Поэтапный дизайн-процесс",
+      "path": "./references/vibecode/staged-design-process.md",
+      "project_types": ["landing-page", "saas-mvp", "general-web-product"],
+      "phases": ["planning", "execution", "verification"],
+      "risks": ["generic-ui", "broken-mobile", "seo-regression"]
+    },
+    {
+      "id": "integration-reliability",
+      "title": "Надёжность интеграций",
+      "path": "./references/vibecode/integration-reliability.md",
+      "project_types": ["telegram-ai-bot", "automation-script", "api-integration-worker", "saas-mvp"],
+      "phases": ["planning", "execution", "verification"],
+      "risks": ["api-failure", "duplicate-delivery", "rate-limit"]
+    },
+    {
+      "id": "anti-slop",
+      "title": "Правила anti-slop",
+      "path": "./references/vibecode/anti-slop.md",
+      "project_types": ["landing-page", "saas-mvp", "telegram-ai-bot", "automation-script", "api-integration-worker", "general-web-product"],
+      "phases": ["planning", "execution", "verification"],
+      "risks": ["generic-output", "fake-complexity", "template-thinking"]
+    },
+    {
+      "id": "scope-discipline",
+      "title": "Дисциплина объёма",
+      "path": "./references/vibecode/scope-discipline.md",
+      "project_types": ["landing-page", "saas-mvp", "telegram-ai-bot", "automation-script", "api-integration-worker", "general-web-product"],
+      "phases": ["discovery", "planning", "execution"],
+      "risks": ["scope-creep", "overbuilding", "unasked-features"]
+    }
+  ],
+  "playbooks": {
+    "landing-page": "./playbooks/landing-page.md",
+    "saas-mvp": "./playbooks/saas-mvp.md",
+    "telegram-ai-bot": "./playbooks/telegram-ai-bot.md",
+    "automation-script": "./playbooks/automation-script.md",
+    "api-integration-worker": "./playbooks/api-integration-worker.md",
+    "general-web-product": "./playbooks/general-web-product.md"
+  },
+  "recommended_skills": {
+    "landing-page": ["frontend-skill", "web-design-guidelines", "playwright", "deploy-to-vercel"],
+    "saas-mvp": ["frontend-skill", "react-best-practices", "shadcn", "supabase-postgres-best-practices", "playwright", "deploy-to-vercel", "security-best-practices"],
+    "telegram-ai-bot": ["playwright", "openai-docs", "security-best-practices"],
+    "automation-script": ["playwright", "openai-docs", "security-best-practices"],
+    "api-integration-worker": ["openai-docs", "security-best-practices", "deploy-to-vercel", "cloudflare-deploy"],
+    "general-web-product": ["frontend-skill", "react-best-practices", "playwright", "security-best-practices"]
+  },
+  "quality_gates": {
+    "landing-page": ["clear-cta", "mobile-polish", "seo-basics", "non-generic-visual-hierarchy"],
+    "saas-mvp": ["auth-boundaries", "data-protection", "non-generic-ui", "smoke-tested-core-flow"],
+    "telegram-ai-bot": ["single-route-navigation", "manual-telegram-walkthrough", "secret-hygiene", "callback-handling"],
+    "automation-script": ["dry-run-or-safe-preview", "logs-present", "failure-paths-defined", "env-documented"],
+    "api-integration-worker": ["input-validation", "idempotent-or-deduplicated", "retry-policy-defined", "request-logging"],
+    "general-web-product": ["architecture-split-is-clear", "smoke-tested-core-flow", "mobile-polish", "env-documented"]
+  }
+}

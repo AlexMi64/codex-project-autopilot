@@ -1,0 +1,49 @@
+{
+  "name": "codex-project-autopilot",
+  "version": "0.1.0",
+  "description": "Локальный плагин Codex, который превращает идею сайта, бота, SaaS MVP или автоматизации в понятный план, маршрут реализации, проверку и финальный handoff.",
+  "author": {
+    "name": "Morecil",
+    "email": "codex@local.invalid",
+    "url": "https://vibecode.morecil.ru/ru/"
+  },
+  "homepage": "https://vibecode.morecil.ru/ru/",
+  "repository": "https://github.com/AlexMi64/codex-project-autopilot",
+  "license": "MIT",
+  "keywords": [
+    "codex-project-autopilot",
+    "project-planning",
+    "site-builder",
+    "telegram-bot",
+    "saas-mvp",
+    "automation-script",
+    "api-integration",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks.json",
+  "interface": {
+    "displayName": "Codex Project Autopilot",
+    "shortDescription": "Превращает идею в понятный план, маршрут реализации, проверку и handoff для новичка",
+    "longDescription": "Codex Project Autopilot помогает пройти путь от сырой идеи до готового результата: задаёт простые вопросы, собирает brief, хранит память проекта, подбирает стек, создаёт дизайн-направление, планирует реализацию, запускает проверку и готовит финальный чеклист по запуску и секретам. Поддерживает сайты, SaaS MVP, Telegram-ботов, скрипты и API-воркеры, хранит состояние локально в workspace, предпочитает уже установленные профильные skills и умеет работать встроенными ролями, если их нет.",
+    "developerName": "Morecil",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://vibecode.morecil.ru/ru/",
+    "privacyPolicyURL": "https://vibecode.morecil.ru/ru/privacy/",
+    "termsOfServiceURL": "https://vibecode.morecil.ru/ru/terms/",
+    "defaultPrompt": [
+      "Запусти новый проект из идеи",
+      "Продолжи текущий проект из состояния .codex-agent",
+      "Подготовь деплой и секреты для этого проекта"
+    ],
+    "brandColor": "#182C61",
+    "composerIcon": "./assets/autonomous-project-agent.svg",
+    "logo": "./assets/autonomous-project-agent.svg",
+    "screenshots": []
+  }
+}
