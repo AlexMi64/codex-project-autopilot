@@ -12,6 +12,7 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_DIR = PLUGIN_ROOT / "templates"
 REFERENCE_DIR = PLUGIN_ROOT / "references"
 KNOWLEDGE_INDEX_PATH = REFERENCE_DIR / "knowledge-index.json"
+ROLE_SYSTEM_VERSION = "morecil-role-system-v1"
 STATE_DIRNAME = ".codex-agent"
 ARTIFACT_FILES = [
     "ultra-context.md",
@@ -81,6 +82,9 @@ REQUIRED_STATE_KEYS = [
     "scope_mode",
     "recommendation_policy",
     "scope_guardrails",
+    "role_system_version",
+    "role_contracts",
+    "handoff_rules",
     "phase_context_targets",
     "cross_checks",
     "user_overrides",
@@ -153,6 +157,150 @@ SCOPE_GUARDRAILS_BASE = [
     "В первую версию включай только то, что нужно для одного рабочего сценария.",
     "Советы по улучшению отделяй от обязательного scope.",
     "Любое расширение scope после плана требует явного подтверждения пользователя.",
+]
+ROLE_CONTRACTS = {
+    "project-discovery": {
+        "mission": "Превращает смутную идею в понятный стартовый контекст без перегруза терминами.",
+        "primary_outputs": [
+            "discovery-questionnaire.md",
+            "project-brief.md",
+            "product-intelligence.md",
+            "plan-variants.md",
+            "beginner-guide.md",
+        ],
+        "done_criteria": [
+            "Понятен один главный сценарий первой версии.",
+            "Явно записано, что не входит в MVP.",
+            "Пользователь может выбрать вариант плана без технических догадок.",
+        ],
+        "handoff_to": ["solution-architect"],
+        "forbidden": [
+            "Начинать реализацию или спорить с потребностью пользователя.",
+            "Подменять вопрос новичка архитектурным допросом.",
+        ],
+    },
+    "solution-architect": {
+        "mission": "Собирает маленький, выполнимый и проверяемый маршрут вместо разросшейся схемы.",
+        "primary_outputs": [
+            "implementation-plan.md",
+            "active-context.md",
+            "progress.md",
+            "plan-variants.md",
+        ],
+        "done_criteria": [
+            "Первая версия ограничена 3-5 обязательными deliverables.",
+            "Зоны frontend, backend, data и automation разделены явно.",
+            "Есть acceptance criteria и список ручных входов от пользователя.",
+        ],
+        "handoff_to": ["design-director", "frontend-builder", "backend-builder", "database-designer", "automation-builder"],
+        "forbidden": [
+            "Раздувать MVP до мини-enterprise.",
+            "Молча превращать рекомендации в обязательные задачи.",
+        ],
+    },
+    "design-director": {
+        "mission": "Даёт продукту характер и визуальную логику вместо дефолтного шаблона.",
+        "primary_outputs": ["design-direction.md", "active-context.md"],
+        "done_criteria": [
+            "Выбрано одно направление с понятным обоснованием.",
+            "Есть anti-generic правила и правила для mobile/readability.",
+            "Дизайн поддерживает задачу продукта, а не отвлекает от неё.",
+        ],
+        "handoff_to": ["frontend-builder"],
+        "forbidden": [
+            "Оставлять дефолтный вид библиотек как финальный дизайн.",
+            "Делать красивый, но нечитабельный интерфейс.",
+        ],
+    },
+    "frontend-builder": {
+        "mission": "Собирает интерфейс как инженер: ясно, устойчиво и без фальшивой витрины.",
+        "primary_outputs": ["frontend-code", "execution-log.md"],
+        "done_criteria": [
+            "Покрыты критичные состояния интерфейса.",
+            "Desktop и mobile не расходятся по качеству.",
+            "UI не опирается на несуществующие API или скрытые допущения.",
+        ],
+        "handoff_to": ["qa-reviewer", "backend-builder"],
+        "forbidden": [
+            "Компенсировать архитектурные дыры красивой обёрткой.",
+            "Придумывать серверную логику, которой нет.",
+        ],
+    },
+    "backend-builder": {
+        "mission": "Делает серверную логику наблюдаемой, валидируемой и пригодной к отладке.",
+        "primary_outputs": ["backend-code", "execution-log.md"],
+        "done_criteria": [
+            "Входные данные валидируются.",
+            "Ключевые события и ошибки логируются.",
+            "Failure-path и интеграционные риски хотя бы базово обработаны.",
+        ],
+        "handoff_to": ["frontend-builder", "qa-reviewer", "deploy-operator"],
+        "forbidden": [
+            "Хранить секреты в коде.",
+            "Оставлять silent failure без сигнала в логах.",
+        ],
+    },
+    "database-designer": {
+        "mission": "Проектирует данные только там, где durable state действительно нужен.",
+        "primary_outputs": ["data-model.md", "migration-plan"],
+        "done_criteria": [
+            "Обосновано, зачем вообще нужна база.",
+            "Ownership, доступ и ограничения описаны.",
+            "Transient и durable state не смешаны.",
+        ],
+        "handoff_to": ["backend-builder", "qa-reviewer", "deploy-operator"],
+        "forbidden": [
+            "Добавлять таблицы без сценария использования.",
+            "Игнорировать доступ и историю данных.",
+        ],
+    },
+    "automation-builder": {
+        "mission": "Собирает безопасные автоматизации, которые не превращаются в чёрный ящик.",
+        "primary_outputs": ["automation-code", "execution-log.md"],
+        "done_criteria": [
+            "Есть dry-run или безопасный preview при side effects.",
+            "Логи позволяют понять, что произошло.",
+            "Повторный запуск не создаёт хаос без причины.",
+        ],
+        "handoff_to": ["qa-reviewer", "deploy-operator"],
+        "forbidden": [
+            "Скрывать side effects от пользователя.",
+            "Строить автоматизацию без наблюдаемости.",
+        ],
+    },
+    "qa-reviewer": {
+        "mission": "Говорит правду о готовности и ловит слабые места перед handoff.",
+        "primary_outputs": ["verification-report.md", "scorecard.md", "findings"],
+        "done_criteria": [
+            "Проверен happy path и хотя бы один failure path.",
+            "Непроверенные зоны отмечены явно.",
+            "Scorecard отражает реальное состояние, а не оптимизм.",
+        ],
+        "handoff_to": ["deploy-operator", "autonomous-project-orchestrator"],
+        "forbidden": [
+            "Писать пустое 'всё ок'.",
+            "Игнорировать handoff, UX или безопасность.",
+        ],
+    },
+    "deploy-operator": {
+        "mission": "Превращает результат в понятный путь до реального запуска.",
+        "primary_outputs": ["env-secrets-checklist.md", "final-handoff.md", "scorecard.md"],
+        "done_criteria": [
+            "Все обязательные ручные шаги перечислены.",
+            "Секреты разделены на обязательные и опциональные.",
+            "Пользователь может запустить проект без догадок.",
+        ],
+        "handoff_to": ["user"],
+        "forbidden": [
+            "Закрывать проект без env checklist.",
+            "Скрывать остаточные риски и ручные действия.",
+        ],
+    },
+}
+HANDOFF_RULES = [
+    "Каждый handoff обязан коротко перечислить: что готово, что не готово, какие решения заморожены, какие риски остались.",
+    "Следующей роли нужно явно назвать 1-3 файла-источника истины, а не отправлять её 'читать всё'.",
+    "Если роль не выполнила done criteria, оркестратор возвращает работу на доработку, а не двигается дальше.",
 ]
 
 
@@ -638,6 +786,10 @@ def phase_context_targets(phase: str, token_mode: str = "ultra") -> list[str]:
     return matrix.get(phase, matrix["discovery"])
 
 
+def active_role_contracts(roles: list[str]) -> dict[str, Any]:
+    return {role: ROLE_CONTRACTS[role] for role in roles if role in ROLE_CONTRACTS}
+
+
 def _task_status_for_phase(task_id: str, phase: str) -> str:
     if task_id == phase:
         return "in_progress"
@@ -760,6 +912,9 @@ def default_state(
         "scope_mode": scope_mode_for_project_type(project_type),
         "recommendation_policy": recommendation_policy_for_project_type(project_type),
         "scope_guardrails": scope_guardrails_for_project_type(project_type, capabilities),
+        "role_system_version": ROLE_SYSTEM_VERSION,
+        "role_contracts": active_role_contracts(roles_for_project_profile(project_type, secondary_archetypes, capabilities)),
+        "handoff_rules": list(HANDOFF_RULES),
         "phase_context_targets": phase_context_targets(phase, token_mode),
         "cross_checks": cross_checks_for_project_type(project_type, secondary_archetypes, capabilities),
         "user_overrides": {},
@@ -918,6 +1073,9 @@ def merge_state_defaults(
 
     merged["token_mode"] = user_overrides.get("token_mode", merged.get("token_mode", "ultra"))
     merged["phase_context_targets"] = phase_context_targets(merged["phase"], merged["token_mode"])
+    merged["role_system_version"] = user_overrides.get("role_system_version", ROLE_SYSTEM_VERSION)
+    merged["role_contracts"] = user_overrides.get("role_contracts", active_role_contracts(merged["active_roles"]))
+    merged["handoff_rules"] = user_overrides.get("handoff_rules", list(HANDOFF_RULES))
     merged["cross_checks"] = user_overrides.get(
         "cross_checks",
         cross_checks_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),

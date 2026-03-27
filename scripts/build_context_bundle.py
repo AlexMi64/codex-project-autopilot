@@ -34,6 +34,21 @@ def build_selected_pack_lines(state: dict, index: dict) -> list[str]:
     return selected_pack_lines
 
 
+def build_role_contract_lines(state: dict) -> list[str]:
+    contracts = state.get("role_contracts", {})
+    lines: list[str] = []
+    for role in state.get("active_roles", []):
+        contract = contracts.get(role, {})
+        mission = contract.get("mission")
+        done = contract.get("done_criteria", [])
+        handoff = contract.get("handoff_to", [])
+        summary = mission or "контракт не описан"
+        done_line = f" done: {done[0]}" if done else ""
+        handoff_line = f" handoff: {', '.join(handoff)}" if handoff else ""
+        lines.append(f"- `{role}`: {summary}.{done_line}{handoff_line}")
+    return lines
+
+
 def build_ultra_context(state: dict) -> str:
     next_task = next((task for task in state.get("tasks", []) if task.get("status") == "in_progress"), None)
     blockers = "да" if state.get("blocked_on_user") else "нет"
@@ -64,6 +79,7 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
         for task in state.get("tasks", [])
         if task.get("status") != "done"
     ]
+    role_contract_lines = build_role_contract_lines(state)
 
     bundle = "\n".join(
         [
@@ -95,6 +111,10 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
             "",
             *[f"- `{role}`" for role in state.get("active_roles", [])],
             "",
+            "## Короткие контракты ролей",
+            "",
+            *(role_contract_lines or ["- контракты ролей не описаны"]),
+            "",
             "## Рекомендуемые skills",
             "",
             *[f"- `{skill}`" for skill in state.get("recommended_skills", [])],
@@ -125,6 +145,10 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
             "## Взаимные проверки ролей",
             "",
             *[f"- {item}" for item in state.get("cross_checks", [])],
+            "",
+            "## Правила handoff",
+            "",
+            *[f"- {item}" for item in state.get("handoff_rules", [])],
             "",
             "## Scope guardrails",
             "",

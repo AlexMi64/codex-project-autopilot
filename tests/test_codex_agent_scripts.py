@@ -45,6 +45,9 @@ class CodexAgentScriptTests(unittest.TestCase):
             self.assertEqual(state["token_mode"], "ultra")
             self.assertEqual(state["selected_plan_variant"], "оптимально")
             self.assertEqual(state["beginner_explanation_mode"], "включен")
+            self.assertEqual(state["role_system_version"], "morecil-role-system-v1")
+            self.assertIn("project-discovery", state["role_contracts"])
+            self.assertTrue(state["handoff_rules"])
             self.assertEqual(len(state["plan_variants"]), 3)
             self.assertIn("ultra-context.md", state["phase_context_targets"])
             self.assertNotIn("single-message-telegram-navigation", state["selected_packs"])
@@ -54,6 +57,9 @@ class CodexAgentScriptTests(unittest.TestCase):
             self.assertTrue((agent_dir / "approval-snapshot.json").exists())
             ultra_context = (agent_dir / "ultra-context.md").read_text(encoding="utf-8")
             self.assertIn("Сначала читай этот файл.", ultra_context)
+            context_bundle = (agent_dir / "context-bundle.md").read_text(encoding="utf-8")
+            self.assertIn("Короткие контракты ролей", context_bundle)
+            self.assertIn("Правила handoff", context_bundle)
 
     def test_init_detects_secondary_archetypes_and_capabilities(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
