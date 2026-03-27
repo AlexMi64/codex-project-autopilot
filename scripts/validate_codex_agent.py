@@ -100,6 +100,8 @@ def validate(workspace: Path, require_finalization: bool) -> list[str]:
         issues.append("В state.json должен быть непустой объект delegation_policy")
     if not isinstance(state.get("delegation_targets"), list):
         issues.append("В state.json должен быть список delegation_targets")
+    if not isinstance(state.get("delegation_packets"), list):
+        issues.append("В state.json должен быть список delegation_packets")
     if not isinstance(state.get("role_system_version"), str) or not state.get("role_system_version"):
         issues.append("В state.json должен быть непустой role_system_version")
     if not isinstance(state.get("souls_version"), str) or not state.get("souls_version"):

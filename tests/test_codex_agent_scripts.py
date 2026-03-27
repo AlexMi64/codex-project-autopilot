@@ -51,6 +51,7 @@ class CodexAgentScriptTests(unittest.TestCase):
             self.assertTrue(state["project_dna"])
             self.assertTrue(state["uniqueness_rules"])
             self.assertTrue(state["deliverable_templates"])
+            self.assertTrue(state["delegation_packets"])
             self.assertIn("project-discovery", state["role_contracts"])
             self.assertTrue(state["handoff_rules"])
             self.assertEqual(len(state["plan_variants"]), 3)
@@ -69,6 +70,7 @@ class CodexAgentScriptTests(unittest.TestCase):
             self.assertIn("Project DNA", context_bundle)
             self.assertIn("Правила уникальности", context_bundle)
             self.assertIn("Шаблоны результатов ролей", context_bundle)
+            self.assertIn("Delegation packets", context_bundle)
 
     def test_init_detects_secondary_archetypes_and_capabilities(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -90,6 +92,7 @@ class CodexAgentScriptTests(unittest.TestCase):
             self.assertEqual(state["orchestration_mode"], "delegated")
             self.assertTrue(any(item.get("role") == "frontend-builder" for item in state["delegation_targets"]))
             self.assertTrue(any(item.get("role") == "backend-builder" for item in state["delegation_targets"]))
+            self.assertTrue(any(item.get("role") == "frontend-builder" for item in state["delegation_packets"]))
             self.assertIn("frontend-builder", state["active_roles"])
             self.assertIn("./playbooks/saas-mvp.md", state["supporting_playbooks"])
 

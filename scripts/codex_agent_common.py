@@ -54,6 +54,7 @@ PLAN_LOCK_FIELDS = [
     "orchestration_mode",
     "delegation_policy",
     "delegation_targets",
+    "delegation_packets",
     "quality_mode",
 ]
 REQUIRED_STATE_KEYS = [
@@ -86,6 +87,7 @@ REQUIRED_STATE_KEYS = [
     "orchestration_mode",
     "delegation_policy",
     "delegation_targets",
+    "delegation_packets",
     "scope_mode",
     "recommendation_policy",
     "scope_guardrails",
@@ -994,6 +996,62 @@ def active_deliverable_templates(roles: list[str]) -> dict[str, list[str]]:
     return {role: DELIVERABLE_TEMPLATES[role] for role in roles if role in DELIVERABLE_TEMPLATES}
 
 
+def packet_inputs_for_role(role: str, phase_context_targets: list[str]) -> list[str]:
+    shared = ["ultra-context.md", "context-bundle.md", "state.json"]
+    role_specific = {
+        "frontend-builder": ["implementation-plan.md", "design-direction.md", "active-context.md"],
+        "backend-builder": ["implementation-plan.md", "tech-context.md", "active-context.md"],
+        "database-designer": ["implementation-plan.md", "product-context.md", "tech-context.md"],
+        "automation-builder": ["implementation-plan.md", "tech-context.md", "active-context.md"],
+        "qa-reviewer": ["implementation-plan.md", "execution-log.md", "verification-report.md"],
+    }
+    return dedupe(shared + role_specific.get(role, []) + phase_context_targets[:2])
+
+
+def write_scope_for_role(role: str) -> list[str]:
+    mapping = {
+        "frontend-builder": ["ui files", "components", "pages", "styles", "execution-log.md"],
+        "backend-builder": ["server handlers", "api routes", "integration logic", "execution-log.md"],
+        "database-designer": ["data-model.md", "migrations", "schema docs", "execution-log.md"],
+        "automation-builder": ["scripts", "workers", "schedulers", "execution-log.md"],
+        "qa-reviewer": ["verification-report.md", "scorecard.md"],
+    }
+    return mapping.get(role, ["execution-log.md"])
+
+
+def delegation_packets_for_roles(
+    roles: list[str],
+    phase_context_targets: list[str],
+    role_contracts: dict[str, Any],
+    deliverable_templates: dict[str, list[str]],
+) -> list[dict[str, Any]]:
+    packets: list[dict[str, Any]] = []
+    for role in roles:
+        if role not in {"frontend-builder", "backend-builder", "database-designer", "automation-builder", "qa-reviewer"}:
+            continue
+        contract = role_contracts.get(role, {})
+        packets.append(
+            {
+                "role": role,
+                "mission": contract.get("mission", ""),
+                "read_first": packet_inputs_for_role(role, phase_context_targets),
+                "write_scope": write_scope_for_role(role),
+                "must_return": {
+                    "deliverables": deliverable_templates.get(role, []),
+                    "handoff_format": [
+                        "что готово",
+                        "что не готово",
+                        "какие решения заморожены",
+                        "какие риски остались",
+                        "что читать следующей роли",
+                    ],
+                },
+                "stop_if": contract.get("forbidden", []),
+            }
+        )
+    return packets
+
+
 def _task_status_for_phase(task_id: str, phase: str) -> str:
     if task_id == phase:
         return "in_progress"
@@ -1086,6 +1144,10 @@ def default_state(
 ) -> dict[str, Any]:
     token_mode = "ultra"
     selected_packs = select_pack_ids(project_type, phase, secondary_archetypes, capabilities)
+    active_roles = roles_for_project_profile(project_type, secondary_archetypes, capabilities)
+    role_contracts = active_role_contracts(active_roles)
+    deliverable_templates = active_deliverable_templates(active_roles)
+    phase_targets = phase_context_targets(phase, token_mode)
     state: dict[str, Any] = {
         "project_type": project_type,
         "project_archetype": project_type,
@@ -1103,7 +1165,7 @@ def default_state(
         "answers": {},
         "assumptions": [],
         "selected_stack": stack_for_project_profile(project_type, capabilities),
-        "active_roles": roles_for_project_profile(project_type, secondary_archetypes, capabilities),
+        "active_roles": active_roles,
         "recommended_skills": recommended_skills_for_project_type(project_type, secondary_archetypes, capabilities),
         "selected_packs": selected_packs,
         "playbook": playbook_for_project_type(project_type),
@@ -1123,11 +1185,12 @@ def default_state(
         "souls_version": SOULS_VERSION,
         "project_dna": project_dna_for_project_type(project_type, capabilities),
         "uniqueness_rules": uniqueness_rules_for_project_type(project_type, capabilities),
-        "deliverable_templates": active_deliverable_templates(roles_for_project_profile(project_type, secondary_archetypes, capabilities)),
-        "role_contracts": active_role_contracts(roles_for_project_profile(project_type, secondary_archetypes, capabilities)),
+        "deliverable_templates": deliverable_templates,
+        "role_contracts": role_contracts,
         "handoff_rules": list(HANDOFF_RULES),
-        "phase_context_targets": phase_context_targets(phase, token_mode),
+        "phase_context_targets": phase_targets,
         "cross_checks": cross_checks_for_project_type(project_type, secondary_archetypes, capabilities),
+        "delegation_packets": delegation_packets_for_roles(active_roles, phase_targets, role_contracts, deliverable_templates),
         "user_overrides": {},
         "tasks": default_tasks(project_type, phase),
         "blocked_on_user": False,
@@ -1296,6 +1359,15 @@ def merge_state_defaults(
     merged["delegation_targets"] = user_overrides.get(
         "delegation_targets",
         delegation_targets_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
+    )
+    merged["delegation_packets"] = user_overrides.get(
+        "delegation_packets",
+        delegation_packets_for_roles(
+            merged["active_roles"],
+            merged["phase_context_targets"],
+            merged["role_contracts"],
+            merged["deliverable_templates"],
+        ),
     )
     merged["cross_checks"] = user_overrides.get(
         "cross_checks",

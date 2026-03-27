@@ -70,6 +70,17 @@ def build_deliverable_template_lines(state: dict) -> list[str]:
     return lines
 
 
+def build_delegation_packet_lines(state: dict) -> list[str]:
+    lines: list[str] = []
+    for packet in state.get("delegation_packets", []):
+        role = packet.get("role", "unknown")
+        read_first = ", ".join(packet.get("read_first", [])[:4])
+        write_scope = ", ".join(packet.get("write_scope", [])[:4])
+        deliverables = ", ".join(packet.get("must_return", {}).get("deliverables", [])[:4])
+        lines.append(f"- `{role}`: читать {read_first}; менять {write_scope}; вернуть {deliverables}")
+    return lines
+
+
 def build_ultra_context(state: dict) -> str:
     next_task = next((task for task in state.get("tasks", []) if task.get("status") == "in_progress"), None)
     blockers = "да" if state.get("blocked_on_user") else "нет"
@@ -105,6 +116,7 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
     role_contract_lines = build_role_contract_lines(state)
     delegation_target_lines = build_delegation_target_lines(state)
     deliverable_template_lines = build_deliverable_template_lines(state)
+    delegation_packet_lines = build_delegation_packet_lines(state)
 
     bundle = "\n".join(
         [
@@ -162,6 +174,7 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
                 for item in state.get("delegation_policy", {}).get(state.get("orchestration_mode", "solo"), {}).get("guardrails", [])
             ],
             *(["", "### Возможные цели делегирования", ""] + delegation_target_lines if delegation_target_lines else []),
+            *(["", "### Delegation packets", ""] + delegation_packet_lines if delegation_packet_lines else []),
             "",
             "## Рекомендуемые skills",
             "",
