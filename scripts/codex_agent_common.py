@@ -99,6 +99,8 @@ REQUIRED_STATE_KEYS = [
     "design_profile",
     "style_inputs",
     "project_dna",
+    "security_profile",
+    "security_guardrails",
     "uniqueness_rules",
     "deliverable_templates",
     "role_contracts",
@@ -154,22 +156,22 @@ CAPABILITY_SKILLS = {
 }
 CAPABILITY_QUALITY_GATES = {
     "ai": ["prompt-and-fallback-paths-defined"],
-    "auth": ["auth-boundaries"],
+    "auth": ["auth-boundaries", "least-privilege", "secrets-not-in-repo"],
     "dashboard": ["role-specific-empty-and-error-states"],
-    "database": ["data-protection"],
-    "payments": ["payment-flow-sandboxed"],
-    "api": ["input-validation"],
-    "automation": ["dry-run-or-safe-preview"],
+    "database": ["data-protection", "least-privilege", "sql-safe-paths"],
+    "payments": ["payment-flow-sandboxed", "secret-hygiene"],
+    "api": ["input-validation", "secret-hygiene"],
+    "automation": ["dry-run-or-safe-preview", "dependency-hygiene"],
     "marketing": ["clear-cta"],
 }
 CAPABILITY_VERIFICATION = {
     "ai": ["fallback-response-check"],
-    "auth": ["auth-flow-smoke-test"],
+    "auth": ["auth-flow-smoke-test", "access-boundary-check"],
     "dashboard": ["core-dashboard-route-check"],
-    "database": ["data-flow-check"],
-    "payments": ["sandbox-payment-check"],
-    "api": ["payload-validation-check"],
-    "automation": ["failure-path-check"],
+    "database": ["data-flow-check", "sql-safety-review", "rls-or-access-review"],
+    "payments": ["sandbox-payment-check", "secret-location-check"],
+    "api": ["payload-validation-check", "secret-location-check"],
+    "automation": ["failure-path-check", "dependency-vulnerability-check"],
     "marketing": ["cta-route-check"],
 }
 SCOPE_GUARDRAILS_BASE = [
@@ -177,6 +179,12 @@ SCOPE_GUARDRAILS_BASE = [
     "В первую версию включай только то, что нужно для одного рабочего сценария.",
     "Советы по улучшению отделяй от обязательного scope.",
     "Любое расширение scope после плана требует явного подтверждения пользователя.",
+]
+SECURITY_GUARDRAILS_BASE = [
+    "Секреты хранятся только в env или панели провайдера, а не в коде и не в репозитории.",
+    "Собирай и храни только те данные, без которых не работает главный сценарий.",
+    "Не логируй токены, пароли, cookie, service_role ключи и другой чувствительный ввод.",
+    "Перед handoff проверь зависимости и уязвимости, а не только happy path приложения.",
 ]
 ROLE_CONTRACTS = {
     "project-discovery": {
@@ -252,6 +260,7 @@ ROLE_CONTRACTS = {
         "done_criteria": [
             "Входные данные валидируются.",
             "Ключевые события и ошибки логируются.",
+            "Секреты не утекли в код, логи или клиентский слой.",
             "Failure-path и интеграционные риски хотя бы базово обработаны.",
         ],
         "handoff_to": ["frontend-builder", "qa-reviewer", "deploy-operator"],
@@ -266,6 +275,7 @@ ROLE_CONTRACTS = {
         "done_criteria": [
             "Обосновано, зачем вообще нужна база.",
             "Ownership, доступ и ограничения описаны.",
+            "Least privilege и путь к RLS/ограничениям зафиксированы.",
             "Transient и durable state не смешаны.",
         ],
         "handoff_to": ["backend-builder", "qa-reviewer", "deploy-operator"],
@@ -294,6 +304,7 @@ ROLE_CONTRACTS = {
         "done_criteria": [
             "Проверен happy path и хотя бы один failure path.",
             "Непроверенные зоны отмечены явно.",
+            "Security-проверки не пропущены, если проект касается данных, auth, платежей или интеграций.",
             "Scorecard отражает реальное состояние, а не оптимизм.",
         ],
         "handoff_to": ["deploy-operator", "autonomous-project-orchestrator"],
@@ -466,6 +477,28 @@ def uniqueness_rules_for_project_type(project_type: str, capabilities: list[str]
     if project_type in {"landing-page", "general-web-product"}:
         rules.append("Смелость допустима только там, где она усиливает продукт; не делай все проекты нарочито креативными по умолчанию.")
     return dedupe(rules)
+
+
+def security_profile_for_project_type(project_type: str, capabilities: list[str] | None = None) -> dict[str, str]:
+    capability_set = set(capabilities or [])
+    needs_strict_data_rules = bool({"database", "auth", "payments"} & capability_set) or project_type in {"saas-mvp", "telegram-ai-bot", "api-integration-worker"}
+    uses_integrations = bool({"api", "automation", "telegram"} & capability_set) or project_type in {"automation-script", "api-integration-worker", "telegram-ai-bot"}
+    profile = {
+        "security_level": "базовые-дефолты",
+        "data_minimization": "не собирать лишние персональные данные и не тянуть базу без сценария",
+        "secret_policy": "секреты только через env; service_role, PAT и сильные ключи не уходят в клиент",
+        "query_policy": "никакой конкатенации SQL; только parameterized queries или ORM",
+        "dependency_policy": "перед handoff проверить зависимости через OSV, npm audit или pip-audit по стеку",
+        "logging_policy": "логи полезны для отладки, но без токенов, паролей и пользовательских секретов",
+    }
+    if needs_strict_data_rules:
+        profile["security_level"] = "усиленный-для-данных-и-доступа"
+        profile["access_policy"] = "least privilege, разделение client/server ключей, RLS или явная модель прав доступа"
+    else:
+        profile["access_policy"] = "не вводить сложную авторизацию без причины; если данных нет, не добавлять лишний access-layer"
+    if uses_integrations:
+        profile["integration_policy"] = "payload валидируется, webhook secrets документируются, retries не раскрывают чувствительные данные"
+    return profile
 
 
 def state_dir(workspace: Path) -> Path:
@@ -798,10 +831,10 @@ def quality_gates_for_project_type(project_type: str, secondary_archetypes: list
 def verification_required_for_project_type(project_type: str, secondary_archetypes: list[str] | None = None, capabilities: list[str] | None = None) -> list[str]:
     verification_matrix = {
         "landing-page": ["desktop-ui-review", "mobile-ui-review", "cta-route-check", "seo-metadata-check"],
-        "saas-mvp": ["auth-flow-smoke-test", "permissions-review", "data-flow-check", "env-audit"],
-        "telegram-ai-bot": ["manual-telegram-walkthrough", "callback-flow-check", "secret-audit", "webhook-readiness"],
-        "automation-script": ["dry-run-check", "logs-review", "failure-path-check", "env-audit"],
-        "api-integration-worker": ["payload-validation-check", "retry-policy-check", "idempotency-check", "provider-secret-audit"],
+        "saas-mvp": ["auth-flow-smoke-test", "permissions-review", "data-flow-check", "env-audit", "dependency-vulnerability-check"],
+        "telegram-ai-bot": ["manual-telegram-walkthrough", "callback-flow-check", "secret-audit", "webhook-readiness", "dependency-vulnerability-check"],
+        "automation-script": ["dry-run-check", "logs-review", "failure-path-check", "env-audit", "dependency-vulnerability-check"],
+        "api-integration-worker": ["payload-validation-check", "retry-policy-check", "idempotency-check", "provider-secret-audit", "dependency-vulnerability-check"],
         "general-web-product": ["core-flow-smoke-test", "mobile-ui-review", "env-audit"],
     }
     items = list(verification_matrix.get(project_type, verification_matrix["general-web-product"]))
@@ -926,6 +959,28 @@ def scope_guardrails_for_project_type(project_type: str, capabilities: list[str]
         guardrails.append("Не превращай лендинг в мини-CMS или SaaS без отдельного решения пользователя.")
     if "payments" in set(capabilities or []):
         guardrails.append("Платежи не должны тянуть за собой лишнюю инфраструктуру, если можно начать с sandbox-сценария.")
+    return dedupe(guardrails)
+
+
+def security_guardrails_for_project_type(project_type: str, capabilities: list[str] | None = None) -> list[str]:
+    capability_set = set(capabilities or [])
+    guardrails = list(SECURITY_GUARDRAILS_BASE)
+    if {"database", "api"} & capability_set or project_type in {"saas-mvp", "api-integration-worker", "telegram-ai-bot"}:
+        guardrails.extend(
+            [
+                "SQL строится только через parameterized queries или ORM; строковая конкатенация считается провалом.",
+                "Права доступа к данным описываются явно: кто что читает, пишет и удаляет.",
+            ]
+        )
+    if {"database", "auth", "payments"} & capability_set:
+        guardrails.extend(
+            [
+                "Service role, PAT и другие сильные ключи не попадают в браузер, бота или публичный фронтенд.",
+                "Если есть пользовательские данные, для первой версии всё равно нужен путь к least privilege и RLS/ограничениям доступа.",
+            ]
+        )
+    if project_type in {"automation-script", "api-integration-worker"} or "automation" in capability_set:
+        guardrails.append("Перед handoff должна быть хотя бы одна проверка зависимостей и уязвимостей проекта.")
     return dedupe(guardrails)
 
 
@@ -1157,6 +1212,8 @@ def doc_open_triggers_for_phase(phase: str, project_type: str, capabilities: lis
         triggers.append("только если нужна документация конкретного AI-провайдера для активной интеграции")
     if {"auth", "database"} & capability_set and phase in {"planning", "execution", "verification"}:
         triggers.append("только если нужно проверить права доступа, схему данных или security boundary")
+    if ({"api", "payments", "automation"} & capability_set or project_type in {"automation-script", "api-integration-worker"}) and phase in {"execution", "verification", "handoff"}:
+        triggers.append("только если нужно понять, как проверять зависимости, секреты, webhook-подписи или уязвимости пакетов")
     if project_type == "telegram-ai-bot" and phase in {"execution", "verification"}:
         triggers.append("только если нужно уточнить callback/navigation-поведение Telegram-сценария")
     return dedupe(triggers)
@@ -1189,7 +1246,7 @@ def packet_inputs_for_role(role: str, phase_context_targets: list[str]) -> list[
         "backend-builder": ["implementation-plan.md", "tech-context.md", "active-context.md"],
         "database-designer": ["implementation-plan.md", "product-context.md", "tech-context.md"],
         "automation-builder": ["implementation-plan.md", "tech-context.md", "active-context.md"],
-        "qa-reviewer": ["implementation-plan.md", "execution-log.md", "verification-report.md"],
+        "qa-reviewer": ["implementation-plan.md", "execution-log.md", "verification-report.md", "env-secrets-checklist.md"],
     }
     return dedupe(shared + role_specific.get(role, []) + phase_context_targets[:2])
 
@@ -1376,6 +1433,8 @@ def default_state(
         "design_profile": design_profile_for_project_type(project_type, capabilities, style_inputs, content_language),
         "style_inputs": style_inputs,
         "project_dna": project_dna_for_project_type(project_type, capabilities),
+        "security_profile": security_profile_for_project_type(project_type, capabilities),
+        "security_guardrails": security_guardrails_for_project_type(project_type, capabilities),
         "uniqueness_rules": uniqueness_rules_for_project_type(project_type, capabilities),
         "deliverable_templates": deliverable_templates,
         "role_contracts": role_contracts,
@@ -1564,6 +1623,8 @@ def merge_state_defaults(
         ),
     )
     merged["project_dna"] = user_overrides.get("project_dna", project_dna_for_project_type(merged["project_type"], merged["capabilities"]))
+    merged["security_profile"] = user_overrides.get("security_profile", security_profile_for_project_type(merged["project_type"], merged["capabilities"]))
+    merged["security_guardrails"] = user_overrides.get("security_guardrails", security_guardrails_for_project_type(merged["project_type"], merged["capabilities"]))
     merged["uniqueness_rules"] = user_overrides.get("uniqueness_rules", uniqueness_rules_for_project_type(merged["project_type"], merged["capabilities"]))
     merged["deliverable_templates"] = user_overrides.get("deliverable_templates", active_deliverable_templates(merged["active_roles"]))
     merged["role_contracts"] = user_overrides.get("role_contracts", active_role_contracts(merged["active_roles"]))

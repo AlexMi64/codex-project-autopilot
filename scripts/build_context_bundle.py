@@ -215,6 +215,20 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
             ]
         )
 
+    if phase in {"discovery", "planning", "execution", "verification", "handoff"}:
+        sections.extend(
+            [
+                "## Безопасные дефолты",
+                "",
+                *limited_lines([f"- {key}: {value}" for key, value in state.get("security_profile", {}).items()], 5),
+                "",
+                "## Security guardrails",
+                "",
+                *limited_lines([f"- {item}" for item in state.get("security_guardrails", [])], 4),
+                "",
+            ]
+        )
+
     if phase in {"planning", "approval", "execution"}:
         sections.extend(
             [

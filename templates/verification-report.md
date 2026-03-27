@@ -22,6 +22,14 @@
 - Tap targets и форма: [pass/fail]
 - Hero на mobile читается без боли: [pass/fail]
 
+## Проверка безопасности
+
+- Секреты не ушли в код или клиент: [pass/fail]
+- SQL / запросы собраны безопасно: [pass/fail/not-applicable]
+- Права доступа / RLS / access boundaries учтены: [pass/fail/not-applicable]
+- Зависимости проверены на уязвимости: [pass/fail/not-run]
+- Что именно запускали: [osv-scanner / npm audit / pip-audit / другое / не запускали]
+
 ## Ручной маршрут проверки
 
 1. [Шаг]

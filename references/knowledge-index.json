@@ -41,6 +41,33 @@
       "risks": ["data-leak", "secret-exposure", "weak-auth"]
     },
     {
+      "id": "sql-safety-defaults",
+      "title": "SQL-безопасность по умолчанию",
+      "path": "./references/vibecode/sql-safety-defaults.md",
+      "project_types": ["saas-mvp", "telegram-ai-bot", "api-integration-worker", "general-web-product"],
+      "phases": ["planning", "execution", "verification"],
+      "risks": ["sql-injection", "unsafe-queries"],
+      "capabilities": ["database", "api", "auth"]
+    },
+    {
+      "id": "database-defense-in-depth",
+      "title": "Защита базы данных и прав доступа",
+      "path": "./references/vibecode/database-defense-in-depth.md",
+      "project_types": ["saas-mvp", "telegram-ai-bot", "api-integration-worker", "general-web-product"],
+      "phases": ["planning", "execution", "verification", "handoff"],
+      "risks": ["data-leak", "weak-permissions", "overpowered-keys"],
+      "capabilities": ["database"]
+    },
+    {
+      "id": "dependency-vulnerability-hygiene",
+      "title": "Проверка зависимостей и уязвимостей",
+      "path": "./references/vibecode/dependency-vulnerability-hygiene.md",
+      "project_types": ["landing-page", "saas-mvp", "telegram-ai-bot", "automation-script", "api-integration-worker", "general-web-product"],
+      "phases": ["verification", "handoff"],
+      "risks": ["vulnerable-dependencies", "supply-chain"],
+      "capabilities": ["automation", "api", "database", "auth", "payments"]
+    },
+    {
       "id": "minimum-observability",
       "title": "Минимальная наблюдаемость",
       "path": "./references/vibecode/minimum-observability.md",
@@ -99,10 +126,10 @@
   },
   "quality_gates": {
     "landing-page": ["clear-cta", "mobile-polish", "seo-basics", "non-generic-visual-hierarchy"],
-    "saas-mvp": ["auth-boundaries", "data-protection", "non-generic-ui", "smoke-tested-core-flow"],
-    "telegram-ai-bot": ["single-route-navigation", "manual-telegram-walkthrough", "secret-hygiene", "callback-handling"],
-    "automation-script": ["dry-run-or-safe-preview", "logs-present", "failure-paths-defined", "env-documented"],
-    "api-integration-worker": ["input-validation", "idempotent-or-deduplicated", "retry-policy-defined", "request-logging"],
-    "general-web-product": ["architecture-split-is-clear", "smoke-tested-core-flow", "mobile-polish", "env-documented"]
+    "saas-mvp": ["auth-boundaries", "data-protection", "non-generic-ui", "smoke-tested-core-flow", "secrets-not-in-repo"],
+    "telegram-ai-bot": ["single-route-navigation", "manual-telegram-walkthrough", "secret-hygiene", "callback-handling", "secrets-not-in-repo"],
+    "automation-script": ["dry-run-or-safe-preview", "logs-present", "failure-paths-defined", "env-documented", "dependency-hygiene"],
+    "api-integration-worker": ["input-validation", "idempotent-or-deduplicated", "retry-policy-defined", "request-logging", "secrets-not-in-repo"],
+    "general-web-product": ["architecture-split-is-clear", "smoke-tested-core-flow", "mobile-polish", "env-documented", "secrets-not-in-repo"]
   }
 }

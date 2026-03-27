@@ -114,6 +114,10 @@ def validate(workspace: Path, require_finalization: bool) -> list[str]:
         issues.append("В state.json должен быть список style_inputs")
     if not isinstance(state.get("project_dna"), dict) or not state.get("project_dna"):
         issues.append("В state.json должен быть непустой объект project_dna")
+    if not isinstance(state.get("security_profile"), dict) or not state.get("security_profile"):
+        issues.append("В state.json должен быть непустой объект security_profile")
+    if not isinstance(state.get("security_guardrails"), list) or not state.get("security_guardrails"):
+        issues.append("В state.json должен быть непустой список security_guardrails")
     if not isinstance(state.get("uniqueness_rules"), list) or not state.get("uniqueness_rules"):
         issues.append("В state.json должен быть непустой список uniqueness_rules")
     if not isinstance(state.get("deliverable_templates"), dict) or not state.get("deliverable_templates"):
