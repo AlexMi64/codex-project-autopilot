@@ -102,6 +102,14 @@ def validate(workspace: Path, require_finalization: bool) -> list[str]:
         issues.append("В state.json должен быть список delegation_targets")
     if not isinstance(state.get("role_system_version"), str) or not state.get("role_system_version"):
         issues.append("В state.json должен быть непустой role_system_version")
+    if not isinstance(state.get("souls_version"), str) or not state.get("souls_version"):
+        issues.append("В state.json должен быть непустой souls_version")
+    if not isinstance(state.get("project_dna"), dict) or not state.get("project_dna"):
+        issues.append("В state.json должен быть непустой объект project_dna")
+    if not isinstance(state.get("uniqueness_rules"), list) or not state.get("uniqueness_rules"):
+        issues.append("В state.json должен быть непустой список uniqueness_rules")
+    if not isinstance(state.get("deliverable_templates"), dict) or not state.get("deliverable_templates"):
+        issues.append("В state.json должен быть непустой объект deliverable_templates")
     if not isinstance(state.get("role_contracts"), dict) or not state.get("role_contracts"):
         issues.append("В state.json должен быть непустой объект role_contracts")
     if not isinstance(state.get("handoff_rules"), list) or not state.get("handoff_rules"):

@@ -13,6 +13,7 @@ TEMPLATE_DIR = PLUGIN_ROOT / "templates"
 REFERENCE_DIR = PLUGIN_ROOT / "references"
 KNOWLEDGE_INDEX_PATH = REFERENCE_DIR / "knowledge-index.json"
 ROLE_SYSTEM_VERSION = "morecil-role-system-v1"
+SOULS_VERSION = "morecil-souls-v1"
 STATE_DIRNAME = ".codex-agent"
 ARTIFACT_FILES = [
     "ultra-context.md",
@@ -89,6 +90,10 @@ REQUIRED_STATE_KEYS = [
     "recommendation_policy",
     "scope_guardrails",
     "role_system_version",
+    "souls_version",
+    "project_dna",
+    "uniqueness_rules",
+    "deliverable_templates",
     "role_contracts",
     "handoff_rules",
     "phase_context_targets",
@@ -335,6 +340,23 @@ DELEGATION_POLICY = {
         ],
     },
 }
+DELIVERABLE_TEMPLATES = {
+    "project-discovery": ["главный сценарий", "аудитория", "что входит в MVP", "что не входит в MVP", "неизвестные ответы"],
+    "solution-architect": ["стек", "deliverables", "acceptance criteria", "known risks", "ручные входы"],
+    "design-director": ["выбранное направление", "палитра", "типографика", "motion rules", "anti-generic rules"],
+    "frontend-builder": ["реализованные маршруты", "покрытые состояния", "зависимости от backend"],
+    "backend-builder": ["стабильные входы/выходы", "логируемые события", "failure-path"],
+    "database-designer": ["сущности", "ownership", "доступ", "ограничения"],
+    "automation-builder": ["dry-run", "логи", "side effects", "правила повторного запуска"],
+    "qa-reviewer": ["findings", "что проверено", "что не проверено", "scorecard"],
+    "deploy-operator": ["env checklist", "manual steps", "launch path", "residual risks"],
+}
+UNIQUENESS_RULES_BASE = [
+    "Не выбирай решение только потому, что оно дефолтное для библиотеки или фреймворка.",
+    "Не повторяй один и тот же визуальный стиль во всех проектах.",
+    "Не заполняй пробелы типичным SaaS-набором без продуктового обоснования.",
+    "Сначала фиксируй главный сценарий и характер продукта, потом выбирай визуал и архитектуру.",
+]
 
 
 def dedupe(items: list[str]) -> list[str]:
@@ -346,6 +368,83 @@ def dedupe(items: list[str]) -> list[str]:
         seen.add(item)
         ordered.append(item)
     return ordered
+
+
+def project_dna_for_project_type(project_type: str, capabilities: list[str] | None = None) -> dict[str, str]:
+    capability_set = set(capabilities or [])
+    matrix = {
+        "landing-page": {
+            "core_promise": "ясно показать ценность и подтолкнуть к одному действию",
+            "interface_energy": "выразительная, но собранная",
+            "trust_signal": "структура, типографика, честный CTA",
+            "uniqueness_axis": "редакционная композиция вместо типового лендинга",
+        },
+        "saas-mvp": {
+            "core_promise": "дать пользователю один реально полезный рабочий сценарий",
+            "interface_energy": "спокойная, инструментальная, но не безликая",
+            "trust_signal": "понятные состояния, data clarity, ощущение контроля",
+            "uniqueness_axis": "product-first UI вместо generic dashboard",
+        },
+        "telegram-ai-bot": {
+            "core_promise": "давать быстрый полезный ответ без хаоса в чате",
+            "interface_energy": "компактная и направляющая",
+            "trust_signal": "понятное меню, отсутствие спама, предсказуемые действия",
+            "uniqueness_axis": "single-message flow вместо россыпи сообщений",
+        },
+        "automation-script": {
+            "core_promise": "экономить рутину без превращения процесса в чёрный ящик",
+            "interface_energy": "минимальная и служебная",
+            "trust_signal": "dry-run, логи, предсказуемые side effects",
+            "uniqueness_axis": "надёжность и объяснимость вместо магии",
+        },
+        "api-integration-worker": {
+            "core_promise": "стабильно связывать системы и переживать сбои",
+            "interface_energy": "техническая и прозрачная",
+            "trust_signal": "контракты, retry, идемпотентность",
+            "uniqueness_axis": "операционная устойчивость вместо красивой обёртки",
+        },
+        "general-web-product": {
+            "core_promise": "довести пользователя до одной полезной цели без лишних подсистем",
+            "interface_energy": "собранная и осмысленная",
+            "trust_signal": "понятный маршрут, сильная структура, отсутствие лишнего",
+            "uniqueness_axis": "характер и product fit вместо усреднённого web UI",
+        },
+    }
+    dna = matrix.get(project_type, matrix["general-web-product"]).copy()
+    if "ai" in capability_set:
+        dna["ai_positioning"] = "AI не должен быть маской для шаблонности; он должен усиливать основной сценарий"
+    if "payments" in capability_set:
+        dna["payments_positioning"] = "Платёжный слой вторичен по отношению к главной ценности продукта"
+    return dna
+
+
+def uniqueness_rules_for_project_type(project_type: str, capabilities: list[str] | None = None) -> list[str]:
+    capability_set = set(capabilities or [])
+    rules = list(UNIQUENESS_RULES_BASE)
+    if project_type == "landing-page":
+        rules.extend(
+            [
+                "Не повторяй одинаковую структуру hero/features/testimonials/contact без причины.",
+                "Избегай дежурной палитры и безликого hero-обещания.",
+            ]
+        )
+    if project_type in {"saas-mvp", "general-web-product"}:
+        rules.extend(
+            [
+                "Не превращай продукт в generic dashboard из одинаковых карточек.",
+                "Визуальный слой должен подчёркивать модель продукта, а не скрывать её.",
+            ]
+        )
+    if project_type == "telegram-ai-bot":
+        rules.extend(
+            [
+                "Не делай UX бота шумным ради иллюзии функциональности.",
+                "Уникальность бота должна идти из сценария и навигации, а не из количества сообщений.",
+            ]
+        )
+    if "ai" in capability_set:
+        rules.append("Не используй AI как стилистическую отговорку для шаблонного продукта.")
+    return dedupe(rules)
 
 
 def state_dir(workspace: Path) -> Path:
@@ -891,6 +990,10 @@ def active_role_contracts(roles: list[str]) -> dict[str, Any]:
     return {role: ROLE_CONTRACTS[role] for role in roles if role in ROLE_CONTRACTS}
 
 
+def active_deliverable_templates(roles: list[str]) -> dict[str, list[str]]:
+    return {role: DELIVERABLE_TEMPLATES[role] for role in roles if role in DELIVERABLE_TEMPLATES}
+
+
 def _task_status_for_phase(task_id: str, phase: str) -> str:
     if task_id == phase:
         return "in_progress"
@@ -1017,6 +1120,10 @@ def default_state(
         "recommendation_policy": recommendation_policy_for_project_type(project_type),
         "scope_guardrails": scope_guardrails_for_project_type(project_type, capabilities),
         "role_system_version": ROLE_SYSTEM_VERSION,
+        "souls_version": SOULS_VERSION,
+        "project_dna": project_dna_for_project_type(project_type, capabilities),
+        "uniqueness_rules": uniqueness_rules_for_project_type(project_type, capabilities),
+        "deliverable_templates": active_deliverable_templates(roles_for_project_profile(project_type, secondary_archetypes, capabilities)),
         "role_contracts": active_role_contracts(roles_for_project_profile(project_type, secondary_archetypes, capabilities)),
         "handoff_rules": list(HANDOFF_RULES),
         "phase_context_targets": phase_context_targets(phase, token_mode),
@@ -1179,6 +1286,10 @@ def merge_state_defaults(
     merged["token_mode"] = user_overrides.get("token_mode", merged.get("token_mode", "ultra"))
     merged["phase_context_targets"] = phase_context_targets(merged["phase"], merged["token_mode"])
     merged["role_system_version"] = user_overrides.get("role_system_version", ROLE_SYSTEM_VERSION)
+    merged["souls_version"] = user_overrides.get("souls_version", SOULS_VERSION)
+    merged["project_dna"] = user_overrides.get("project_dna", project_dna_for_project_type(merged["project_type"], merged["capabilities"]))
+    merged["uniqueness_rules"] = user_overrides.get("uniqueness_rules", uniqueness_rules_for_project_type(merged["project_type"], merged["capabilities"]))
+    merged["deliverable_templates"] = user_overrides.get("deliverable_templates", active_deliverable_templates(merged["active_roles"]))
     merged["role_contracts"] = user_overrides.get("role_contracts", active_role_contracts(merged["active_roles"]))
     merged["handoff_rules"] = user_overrides.get("handoff_rules", list(HANDOFF_RULES))
     merged["delegation_policy"] = user_overrides.get("delegation_policy", DELEGATION_POLICY)

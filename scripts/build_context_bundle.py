@@ -59,6 +59,17 @@ def build_delegation_target_lines(state: dict) -> list[str]:
     return lines
 
 
+def build_deliverable_template_lines(state: dict) -> list[str]:
+    lines: list[str] = []
+    templates = state.get("deliverable_templates", {})
+    for role in state.get("active_roles", []):
+        parts = templates.get(role, [])
+        if not parts:
+            continue
+        lines.append(f"- `{role}`: {', '.join(parts[:4])}")
+    return lines
+
+
 def build_ultra_context(state: dict) -> str:
     next_task = next((task for task in state.get("tasks", []) if task.get("status") == "in_progress"), None)
     blockers = "да" if state.get("blocked_on_user") else "нет"
@@ -73,6 +84,7 @@ def build_ultra_context(state: dict) -> str:
         f"- Вторичные архетипы: `{', '.join(state.get('secondary_archetypes', [])) or 'нет'}`",
         f"- Capabilities: `{', '.join(state.get('capabilities', [])) or 'нет'}`",
         f"- Режим оркестрации: `{state.get('orchestration_mode', 'solo')}`",
+        f"- Soul system: `{state.get('souls_version', 'unknown')}`",
         f"- План заморожен: `{'да' if state.get('approval_snapshot', {}).get('locked') else 'нет'}`",
         f"- Выбранный вариант плана: `{state.get('selected_plan_variant', 'оптимально')}`",
         f"- Режим объяснений: `{state.get('beginner_explanation_mode', 'включен')}`",
@@ -92,6 +104,7 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
     ]
     role_contract_lines = build_role_contract_lines(state)
     delegation_target_lines = build_delegation_target_lines(state)
+    deliverable_template_lines = build_deliverable_template_lines(state)
 
     bundle = "\n".join(
         [
@@ -109,12 +122,21 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
             f"- Режим токенов: `{state.get('token_mode', 'ultra')}`",
             f"- Режим качества: `{state.get('quality_mode', 'сбалансированно')}`",
             f"- Режим оркестрации: `{state.get('orchestration_mode', 'solo')}`",
+            f"- Soul system: `{state.get('souls_version', 'unknown')}`",
             f"- План заморожен: `{'да' if state.get('approval_snapshot', {}).get('locked') else 'нет'}`",
             f"- Выбранный вариант плана: `{state.get('selected_plan_variant', 'оптимально')}`",
             f"- Режим объяснений: `{state.get('beginner_explanation_mode', 'включен')}`",
             f"- Режим scope: `{state.get('scope_mode', 'mvp-с-отдельным-блоком-рекомендаций')}`",
             f"- Политика рекомендаций: `{state.get('recommendation_policy', 'советы отдельно от MVP')}`",
             f"- Маршрут реализации: `{state.get('playbook', '')}`",
+            "",
+            "## Project DNA",
+            "",
+            *[f"- {key}: {value}" for key, value in state.get("project_dna", {}).items()],
+            "",
+            "## Правила уникальности",
+            "",
+            *[f"- {item}" for item in state.get("uniqueness_rules", [])],
             "",
             "## Стек",
             "",
@@ -127,6 +149,10 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
             "## Короткие контракты ролей",
             "",
             *(role_contract_lines or ["- контракты ролей не описаны"]),
+            "",
+            "## Шаблоны результатов ролей",
+            "",
+            *(deliverable_template_lines or ["- шаблоны результатов ролей не описаны"]),
             "",
             "## Делегирование",
             "",
