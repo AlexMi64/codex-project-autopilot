@@ -81,6 +81,50 @@ def build_delegation_packet_lines(state: dict) -> list[str]:
     return lines
 
 
+def limited_lines(items: list[str], limit: int) -> list[str]:
+    if len(items) <= limit:
+        return items
+    hidden = len(items) - limit
+    return items[:limit] + [f"- ... ещё {hidden} пункт(ов), открывай подробные файлы только если они реально нужны."]
+
+
+def phase_heading(state: dict) -> list[str]:
+    return [
+        "## Текущая фаза",
+        "",
+        f"- Фаза: `{state.get('phase', 'unknown')}`",
+        f"- Режим токенов: `{state.get('token_mode', 'ultra')}`",
+        f"- Режим оркестрации: `{state.get('orchestration_mode', 'solo')}`",
+        f"- Политика чтения docs: `{state.get('doc_read_policy', 'summary-first, docs-on-demand')}`",
+        f"- Сначала открой: `{', '.join(state.get('phase_context_targets', [])[:4])}`",
+    ]
+
+
+def next_task_line(state: dict) -> str:
+    next_task = next((task for task in state.get("tasks", []) if task.get("status") == "in_progress"), None)
+    if not next_task:
+        return "- Текущий шаг: `нет активного шага`"
+    return f"- Текущий шаг: `{next_task['id']}` -> {next_task['title']}"
+
+
+def build_phase_card(state: dict) -> str:
+    lines = [
+        "# Фазовая карточка",
+        "",
+        "Прочитай этот файл первым. Если его хватает для следующего решения, остальные файлы не открывай.",
+        "",
+        f"- Цель: {state.get('goal') or '[не задана]'}",
+        f"- Архетип: `{state.get('project_type', 'unknown')}`",
+        next_task_line(state),
+        f"- Выбранный план: `{state.get('selected_plan_variant', 'оптимально')}`",
+        f"- План заморожен: `{'да' if state.get('approval_snapshot', {}).get('locked') else 'нет'}`",
+        f"- Нужен ответ пользователя: `{'да' if state.get('blocked_on_user') else 'нет'}`",
+        f"- Открывай полные docs только если: {state.get('doc_open_triggers', ['без них нельзя сделать текущий шаг'])[0]}",
+        f"- Потом, если нужно: `{', '.join(state.get('phase_context_targets', [])[:4])}`",
+    ]
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def build_ultra_context(state: dict) -> str:
     next_task = next((task for task in state.get("tasks", []) if task.get("status") == "in_progress"), None)
     blockers = "да" if state.get("blocked_on_user") else "нет"
@@ -100,14 +144,16 @@ def build_ultra_context(state: dict) -> str:
         f"- Выбранный вариант плана: `{state.get('selected_plan_variant', 'оптимально')}`",
         f"- Режим объяснений: `{state.get('beginner_explanation_mode', 'включен')}`",
         f"- Режим scope: `{state.get('scope_mode', 'mvp-с-отдельным-блоком-рекомендаций')}`",
+        f"- Политика docs: `{state.get('doc_read_policy', 'summary-first, docs-on-demand')}`",
         f"- Следующий шаг: `{next_task['id']}` -> {next_task['title']}" if next_task else "- Следующий шаг: `нет активного шага`",
         f"- Нужен ответ пользователя: `{blockers}`",
-        f"- Сначала открой: `{', '.join(state.get('phase_context_targets', [])[:3])}`",
+        f"- Сначала открой: `{', '.join(state.get('phase_context_targets', [])[:4])}`",
     ]
     return "\n".join(lines).rstrip() + "\n"
 
 
 def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
+    phase = state.get("phase", "discovery")
     current_tasks = [
         f"- `{task['id']}` ({task['status']}): {task['title']}"
         for task in state.get("tasks", [])
@@ -115,121 +161,167 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
     ]
     role_contract_lines = build_role_contract_lines(state)
     delegation_target_lines = build_delegation_target_lines(state)
-    deliverable_template_lines = build_deliverable_template_lines(state)
     delegation_packet_lines = build_delegation_packet_lines(state)
+    sections: list[str] = [
+        "# Контекстный bundle",
+        "",
+        "Открывай этот файл только если `phase-card.md` и `ultra-context.md` уже не дают ответа на текущий шаг.",
+        "",
+        "## Проект",
+        "",
+        f"- Цель: {state.get('goal') or '[не задана]'}",
+        f"- Архетип: `{state.get('project_type', 'unknown')}`",
+        f"- Capabilities: `{', '.join(state.get('capabilities', [])) or 'нет'}`",
+        f"- Маршрут реализации: `{state.get('playbook', '')}`",
+        "",
+        *phase_heading(state),
+        "",
+    ]
 
-    bundle = "\n".join(
+    if phase in {"discovery", "planning", "approval"}:
+        sections.extend(
+            [
+                "## Product DNA",
+                "",
+                *limited_lines([f"- {key}: {value}" for key, value in state.get("project_dna", {}).items()], 3),
+                "",
+                "## Правила уникальности",
+                "",
+                *limited_lines([f"- {item}" for item in state.get("uniqueness_rules", [])], 4),
+                "",
+                "## Варианты плана",
+                "",
+                *[
+                    f"- `{variant.get('id')}`: {variant.get('summary')}"
+                    for variant in state.get("plan_variants", [])
+                ],
+                "",
+            ]
+        )
+
+    if phase in {"planning", "approval", "execution"}:
+        sections.extend(
+            [
+                "## Стек",
+                "",
+                *limited_lines([f"- {key}: {value}" for key, value in state.get("selected_stack", {}).items()], 5),
+                "",
+                "## Активные роли",
+                "",
+                *limited_lines([f"- `{role}`" for role in state.get("active_roles", [])], 6),
+                "",
+            ]
+        )
+
+    if phase in {"planning", "execution"}:
+        sections.extend(
+            [
+                "## Короткие контракты ролей",
+                "",
+                *(limited_lines(role_contract_lines, 4) or ["- контракты ролей не описаны"]),
+                "",
+            ]
+        )
+
+    if phase == "execution" and state.get("orchestration_mode") == "delegated":
+        sections.extend(
+            [
+                "## Делегирование",
+                "",
+                *limited_lines(
+                    [
+                        f"- {item}"
+                        for item in state.get("delegation_policy", {}).get("delegated", {}).get("guardrails", [])
+                    ],
+                    3,
+                ),
+                "",
+                "### Возможные цели",
+                "",
+                *limited_lines(delegation_target_lines, 4),
+                "",
+                "### Delegation packets",
+                "",
+                *limited_lines(delegation_packet_lines, 3),
+                "",
+            ]
+        )
+
+    if phase in {"discovery", "planning", "execution"}:
+        sections.extend(
+            [
+                "## Активные knowledge packs",
+                "",
+                *(selected_pack_lines or ["- нет"]),
+                "",
+            ]
+        )
+
+    if phase in {"planning", "approval", "execution", "verification"}:
+        sections.extend(
+            [
+                "## Критерии качества",
+                "",
+                *limited_lines([f"- `{gate}`" for gate in state.get("quality_gates", [])], 6),
+                "",
+            ]
+        )
+
+    if phase in {"verification", "handoff"}:
+        sections.extend(
+            [
+                "## Обязательная проверка",
+                "",
+                *limited_lines([f"- `{item}`" for item in state.get("verification_required", [])], 6),
+                "",
+            ]
+        )
+
+    if phase == "verification":
+        sections.extend(
+            [
+                "## Взаимные проверки",
+                "",
+                *limited_lines([f"- {item}" for item in state.get("cross_checks", [])], 4),
+                "",
+            ]
+        )
+
+    if phase == "handoff":
+        sections.extend(
+            [
+                "## Правила handoff",
+                "",
+                *limited_lines([f"- {item}" for item in state.get("handoff_rules", [])], 4),
+                "",
+            ]
+        )
+
+    sections.extend(
         [
-            "# Контекстный bundle",
-            "",
-            "Используй этот файл вторым после `ultra-context.md`, если нужен расширенный, но всё ещё экономный контекст.",
-            "",
-            "## Текущий проект",
-            "",
-            f"- Цель: {state.get('goal') or '[не задана]'}",
-            f"- Архетип: `{state.get('project_type', 'unknown')}`",
-            f"- Вторичные архетипы: `{', '.join(state.get('secondary_archetypes', [])) or 'нет'}`",
-            f"- Capabilities: `{', '.join(state.get('capabilities', [])) or 'нет'}`",
-            f"- Фаза: `{state.get('phase', 'unknown')}`",
-            f"- Режим токенов: `{state.get('token_mode', 'ultra')}`",
-            f"- Режим качества: `{state.get('quality_mode', 'сбалансированно')}`",
-            f"- Режим оркестрации: `{state.get('orchestration_mode', 'solo')}`",
-            f"- Soul system: `{state.get('souls_version', 'unknown')}`",
-            f"- План заморожен: `{'да' if state.get('approval_snapshot', {}).get('locked') else 'нет'}`",
-            f"- Выбранный вариант плана: `{state.get('selected_plan_variant', 'оптимально')}`",
-            f"- Режим объяснений: `{state.get('beginner_explanation_mode', 'включен')}`",
-            f"- Режим scope: `{state.get('scope_mode', 'mvp-с-отдельным-блоком-рекомендаций')}`",
-            f"- Политика рекомендаций: `{state.get('recommendation_policy', 'советы отдельно от MVP')}`",
-            f"- Маршрут реализации: `{state.get('playbook', '')}`",
-            "",
-            "## Project DNA",
-            "",
-            *[f"- {key}: {value}" for key, value in state.get("project_dna", {}).items()],
-            "",
-            "## Правила уникальности",
-            "",
-            *[f"- {item}" for item in state.get("uniqueness_rules", [])],
-            "",
-            "## Стек",
-            "",
-            *[f"- {key}: {value}" for key, value in state.get("selected_stack", {}).items()],
-            "",
-            "## Активные роли",
-            "",
-            *[f"- `{role}`" for role in state.get("active_roles", [])],
-            "",
-            "## Короткие контракты ролей",
-            "",
-            *(role_contract_lines or ["- контракты ролей не описаны"]),
-            "",
-            "## Шаблоны результатов ролей",
-            "",
-            *(deliverable_template_lines or ["- шаблоны результатов ролей не описаны"]),
-            "",
-            "## Делегирование",
-            "",
-            f"- Активный режим: `{state.get('orchestration_mode', 'solo')}`",
-            *[
-                f"- {item}"
-                for item in state.get("delegation_policy", {}).get(state.get("orchestration_mode", "solo"), {}).get("guardrails", [])
-            ],
-            *(["", "### Возможные цели делегирования", ""] + delegation_target_lines if delegation_target_lines else []),
-            *(["", "### Delegation packets", ""] + delegation_packet_lines if delegation_packet_lines else []),
-            "",
-            "## Рекомендуемые skills",
-            "",
-            *[f"- `{skill}`" for skill in state.get("recommended_skills", [])],
-            "",
-            "## Выбранные knowledge packs",
-            "",
-            *(selected_pack_lines or ["- нет"]),
-            "",
-            "## Варианты плана",
-            "",
-            *[
-                f"- `{variant.get('id')}`: {variant.get('summary')} Выбирать, когда {variant.get('when_to_choose', '').lower()}"
-                for variant in state.get("plan_variants", [])
-            ],
-            "",
-            "## Критерии качества",
-            "",
-            *[f"- `{gate}`" for gate in state.get("quality_gates", [])],
-            "",
-            "## Обязательная проверка",
-            "",
-            *[f"- `{item}`" for item in state.get("verification_required", [])],
-            "",
-            "## Сначала читай эти файлы",
-            "",
-            *[f"- `{path}`" for path in state.get("phase_context_targets", [])],
-            "",
-            "## Взаимные проверки ролей",
-            "",
-            *[f"- {item}" for item in state.get("cross_checks", [])],
-            "",
-            "## Правила handoff",
-            "",
-            *[f"- {item}" for item in state.get("handoff_rules", [])],
-            "",
             "## Scope guardrails",
             "",
-            *[f"- {item}" for item in state.get("scope_guardrails", [])],
+            *limited_lines([f"- {item}" for item in state.get("scope_guardrails", [])], 4),
             "",
-            "## Текущая очередь работы",
+            "## Открывай полные docs только если",
             "",
-            *(current_tasks or ["- нет активных задач"]),
+            *limited_lines([f"- {item}" for item in state.get("doc_open_triggers", [])], 4),
+            "",
+            "## Текущая очередь",
+            "",
+            *(limited_lines(current_tasks, 4) if current_tasks else ["- нет активных задач"]),
             "",
             "## Правила экономии токенов",
             "",
-            "- Сначала читай `ultra-context.md`, а не весь набор артефактов.",
-            "- Открывай `context-bundle.md` только если ультра-контекста уже недостаточно.",
-            "- Открывай другие файлы из `.codex-agent` только если они реально нужны текущему шагу.",
-            "- Используй `state.json` для маршрутизации решений, а не перечитывай длинные документы.",
-            "- Считай knowledge packs краткими инструкциями и открывай полный pack только для активной подсистемы.",
-            "- Если план уже заморожен, не пересобирай стек и роли без явной причины.",
+            "- Сначала читай `phase-card.md`, потом `ultra-context.md`.",
+            "- Открывай `context-bundle.md` только если коротких файлов уже недостаточно.",
+            "- Открывай полные docs только по текущим триггерам фазы.",
+            "- Используй `state.json` для маршрутизации решений, а не для полного перечитывания проекта.",
+            "- Если план уже заморожен, не пересобирай стек, роли и packs без явной причины.",
         ]
-    ).rstrip() + "\n"
-    return bundle
+    )
+
+    return "\n".join(sections).rstrip() + "\n"
 
 
 def main() -> None:
@@ -240,8 +332,10 @@ def main() -> None:
     index = load_knowledge_index()
 
     selected_pack_lines = build_selected_pack_lines(state, index)
+    (agent_dir / "phase-card.md").write_text(build_phase_card(state), encoding="utf-8")
     (agent_dir / "ultra-context.md").write_text(build_ultra_context(state), encoding="utf-8")
     (agent_dir / "context-bundle.md").write_text(build_context_bundle(state, selected_pack_lines), encoding="utf-8")
+    print(agent_dir / "phase-card.md")
     print(agent_dir / "ultra-context.md")
     print(agent_dir / "context-bundle.md")
 

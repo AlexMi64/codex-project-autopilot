@@ -28,7 +28,7 @@ def main() -> None:
     subprocess.run(python_cmd + [str(script_dir / "build_context_bundle.py"), "--workspace", str(workspace)], check=True, capture_output=True, text=True)
     subprocess.run(python_cmd + [str(script_dir / "validate_codex_agent.py"), "--workspace", str(workspace), "--soft-fail"], check=True)
     print(
-        "[codex-agent] Guardrail reminder: keep ultra-context.md, state.json, implementation-plan.md, approval-snapshot.json, env-secrets-checklist.md, and final-handoff.md in sync."
+        "[codex-agent] Guardrail reminder: keep phase-card.md, ultra-context.md, state.json, implementation-plan.md, approval-snapshot.json, env-secrets-checklist.md, and final-handoff.md in sync."
     )
 
 

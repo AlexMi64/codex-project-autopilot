@@ -116,6 +116,10 @@ def validate(workspace: Path, require_finalization: bool) -> list[str]:
         issues.append("В state.json должен быть непустой объект role_contracts")
     if not isinstance(state.get("handoff_rules"), list) or not state.get("handoff_rules"):
         issues.append("В state.json должен быть непустой список handoff_rules")
+    if not isinstance(state.get("doc_read_policy"), str) or not state.get("doc_read_policy"):
+        issues.append("В state.json должен быть непустой doc_read_policy")
+    if not isinstance(state.get("doc_open_triggers"), list) or not state.get("doc_open_triggers"):
+        issues.append("В state.json должен быть непустой список doc_open_triggers")
     if not isinstance(state.get("cross_checks"), list) or not state.get("cross_checks"):
         issues.append("В state.json должен быть непустой список cross_checks")
     if not isinstance(state.get("tasks"), list) or not state.get("tasks"):
@@ -142,8 +146,10 @@ def validate(workspace: Path, require_finalization: bool) -> list[str]:
     token_mode = state.get("token_mode", "ultra")
     if token_mode == "ultra":
         targets = state.get("phase_context_targets", [])
-        if not targets or targets[0] != "ultra-context.md":
-            issues.append("В режиме ultra первым phase_context_targets должен быть ultra-context.md")
+        if not targets or targets[0] != "phase-card.md":
+            issues.append("В режиме ultra первым phase_context_targets должен быть phase-card.md")
+        if len(targets) < 2 or targets[1] != "ultra-context.md":
+            issues.append("В режиме ultra вторым phase_context_targets должен быть ultra-context.md")
 
     expected_packs = select_pack_ids(
         state.get("project_type", "general-web-product"),
@@ -158,6 +164,7 @@ def validate(workspace: Path, require_finalization: bool) -> list[str]:
             issues.append(f"selected_packs содержит элементы не по текущей фазе/архетипу: {', '.join(unexpected_packs)}")
 
     required_for_planning = [
+        "phase-card.md",
         "ultra-context.md",
         "context-bundle.md",
         "discovery-questionnaire.md",

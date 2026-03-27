@@ -54,23 +54,27 @@ class CodexAgentScriptTests(unittest.TestCase):
             self.assertTrue(state["delegation_packets"])
             self.assertIn("project-discovery", state["role_contracts"])
             self.assertTrue(state["handoff_rules"])
+            self.assertTrue(state["doc_read_policy"])
+            self.assertTrue(state["doc_open_triggers"])
             self.assertEqual(len(state["plan_variants"]), 3)
-            self.assertIn("ultra-context.md", state["phase_context_targets"])
+            self.assertEqual(state["phase_context_targets"][0], "phase-card.md")
+            self.assertEqual(state["phase_context_targets"][1], "ultra-context.md")
             self.assertNotIn("single-message-telegram-navigation", state["selected_packs"])
+            self.assertTrue((agent_dir / "phase-card.md").exists())
             self.assertTrue((agent_dir / "ultra-context.md").exists())
             self.assertTrue((agent_dir / "plan-variants.md").exists())
             self.assertTrue((agent_dir / "beginner-guide.md").exists())
             self.assertTrue((agent_dir / "approval-snapshot.json").exists())
+            phase_card = (agent_dir / "phase-card.md").read_text(encoding="utf-8")
+            self.assertIn("Прочитай этот файл первым.", phase_card)
             ultra_context = (agent_dir / "ultra-context.md").read_text(encoding="utf-8")
             self.assertIn("Сначала читай этот файл.", ultra_context)
             self.assertIn("Soul system", ultra_context)
             context_bundle = (agent_dir / "context-bundle.md").read_text(encoding="utf-8")
-            self.assertIn("Короткие контракты ролей", context_bundle)
-            self.assertIn("Правила handoff", context_bundle)
-            self.assertIn("Project DNA", context_bundle)
+            self.assertIn("Product DNA", context_bundle)
             self.assertIn("Правила уникальности", context_bundle)
-            self.assertIn("Шаблоны результатов ролей", context_bundle)
-            self.assertIn("Delegation packets", context_bundle)
+            self.assertIn("Открывай полные docs только если", context_bundle)
+            self.assertNotIn("Правила handoff", context_bundle)
 
     def test_init_detects_secondary_archetypes_and_capabilities(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -189,6 +193,7 @@ class CodexAgentScriptTests(unittest.TestCase):
 
             agent_dir = workspace / ".codex-agent"
             replacements = {
+                "phase-card.md": "# Фазовая карточка\n\nПрочитай этот файл первым. Если его хватает для следующего решения, остальные файлы не открывай.\n- Цель: Лендинг-портфолио\n- Архетип: `landing-page`\n- Текущий шаг: `handoff` -> Подготовить передачу\n",
                 "ultra-context.md": "# Ультра-контекст\n\nСначала читай этот файл. Проект находится на стадии handoff и готов к передаче.\n- Цель: Лендинг-портфолио\n- Фаза: handoff\n- Основной архетип: landing-page\n- План заморожен: да\n",
                 "context-bundle.md": "# Контекстный bundle\n\nИспользуй этот файл вторым после `ultra-context.md`, если нужен расширенный, но всё ещё экономный контекст.\n",
                 "discovery-questionnaire.md": "# Квиз discovery\n\nПользователь хочет простой сайт-портфолио. Квиз подтвердил, что логин, платежи и база данных не нужны.\n",
@@ -215,6 +220,8 @@ class CodexAgentScriptTests(unittest.TestCase):
             state["approval_status"] = "approved"
             state["selected_packs"] = ["memory-bank"]
             state["selected_plan_variant"] = "оптимально"
+            state["doc_read_policy"] = "final-state-first, docs-for-manual-steps-only"
+            state["doc_open_triggers"] = ["только если нужно уточнить ручной шаг или секрет"]
             state["plan_variants"] = [
                 {"id": "минимум", "title": "Минимум", "summary": "Один рабочий сценарий", "when_to_choose": "Когда нужен быстрый запуск"},
                 {"id": "оптимально", "title": "Оптимально", "summary": "Баланс скорости и качества", "when_to_choose": "Когда нужен лучший базовый результат"},

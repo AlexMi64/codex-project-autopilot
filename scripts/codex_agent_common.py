@@ -16,6 +16,7 @@ ROLE_SYSTEM_VERSION = "morecil-role-system-v1"
 SOULS_VERSION = "morecil-souls-v1"
 STATE_DIRNAME = ".codex-agent"
 ARTIFACT_FILES = [
+    "phase-card.md",
     "ultra-context.md",
     "context-bundle.md",
     "discovery-questionnaire.md",
@@ -99,6 +100,8 @@ REQUIRED_STATE_KEYS = [
     "role_contracts",
     "handoff_rules",
     "phase_context_targets",
+    "doc_read_policy",
+    "doc_open_triggers",
     "cross_checks",
     "user_overrides",
     "tasks",
@@ -898,45 +901,51 @@ def phase_context_targets(phase: str, token_mode: str = "ultra") -> list[str]:
     if token_mode == "ultra":
         matrix = {
             "discovery": [
+                "phase-card.md",
                 "ultra-context.md",
-                "context-bundle.md",
                 "discovery-questionnaire.md",
                 "state.json",
+                "context-bundle.md",
             ],
             "planning": [
+                "phase-card.md",
                 "ultra-context.md",
-                "context-bundle.md",
                 "project-brief.md",
-                "product-intelligence.md",
                 "state.json",
+                "context-bundle.md",
+                "product-intelligence.md",
             ],
             "approval": [
+                "phase-card.md",
                 "ultra-context.md",
-                "context-bundle.md",
                 "implementation-plan.md",
-                "design-direction.md",
                 "state.json",
+                "context-bundle.md",
+                "design-direction.md",
             ],
             "execution": [
+                "phase-card.md",
                 "ultra-context.md",
-                "context-bundle.md",
                 "implementation-plan.md",
-                "active-context.md",
                 "state.json",
+                "context-bundle.md",
+                "active-context.md",
             ],
             "verification": [
+                "phase-card.md",
                 "ultra-context.md",
+                "verification-report.md",
+                "state.json",
                 "context-bundle.md",
                 "implementation-plan.md",
-                "verification-report.md",
-                "state.json",
             ],
             "handoff": [
+                "phase-card.md",
                 "ultra-context.md",
-                "context-bundle.md",
-                "verification-report.md",
-                "env-secrets-checklist.md",
+                "final-handoff.md",
                 "state.json",
+                "context-bundle.md",
+                "env-secrets-checklist.md",
             ],
         }
         return matrix.get(phase, matrix["discovery"])
@@ -988,6 +997,62 @@ def phase_context_targets(phase: str, token_mode: str = "ultra") -> list[str]:
     return matrix.get(phase, matrix["discovery"])
 
 
+def doc_open_triggers_for_phase(phase: str, project_type: str, capabilities: list[str] | None = None) -> list[str]:
+    capability_set = set(capabilities or [])
+    matrix = {
+        "discovery": [
+            "только если ответ пользователя меняет scope первой версии",
+            "только если без уточнения архетипа нельзя выбрать playbook",
+            "только если короткой сводки уже недостаточно для следующего вопроса",
+        ],
+        "planning": [
+            "только если нужно обосновать выбор стека или базы данных",
+            "только если активный knowledge pack влияет на архитектурное решение",
+            "только если без документа нельзя собрать реалистичный MVP-план",
+        ],
+        "approval": [
+            "только если нужно проверить, что план и дизайн-направление не конфликтуют",
+            "только если есть риск молча расширить scope",
+            "только если пользователь просит подробное объяснение решения",
+        ],
+        "execution": [
+            "только если активная роль реально упёрлась в контракт, API или data model",
+            "только если без документа нельзя безопасно менять код",
+            "только если текущий файл не даёт ответа на следующий инженерный шаг",
+        ],
+        "verification": [
+            "только если нужно подтвердить конкретный quality gate",
+            "только если без документа нельзя воспроизвести failure-path",
+            "только если handoff рискует остаться без доказательства проверки",
+        ],
+        "handoff": [
+            "только если нужно уточнить ручной шаг, секрет или порядок запуска",
+            "только если без документа нельзя объяснить остаточный риск",
+            "только если пользователь просит более подробный итог",
+        ],
+    }
+    triggers = list(matrix.get(phase, matrix["discovery"]))
+    if "ai" in capability_set and phase in {"planning", "execution"}:
+        triggers.append("только если нужна документация конкретного AI-провайдера для активной интеграции")
+    if {"auth", "database"} & capability_set and phase in {"planning", "execution", "verification"}:
+        triggers.append("только если нужно проверить права доступа, схему данных или security boundary")
+    if project_type == "telegram-ai-bot" and phase in {"execution", "verification"}:
+        triggers.append("только если нужно уточнить callback/navigation-поведение Telegram-сценария")
+    return dedupe(triggers)
+
+
+def doc_read_policy_for_phase(phase: str) -> str:
+    policies = {
+        "discovery": "summary-first, quiz-first, docs-last",
+        "planning": "summary-first, decision-driven docs",
+        "approval": "locked-plan-first, no speculative reading",
+        "execution": "task-first, code-first, docs-on-blocker",
+        "verification": "evidence-first, docs-for-proof-only",
+        "handoff": "final-state-first, docs-for-manual-steps-only",
+    }
+    return policies.get(phase, "summary-first, docs-on-demand")
+
+
 def active_role_contracts(roles: list[str]) -> dict[str, Any]:
     return {role: ROLE_CONTRACTS[role] for role in roles if role in ROLE_CONTRACTS}
 
@@ -997,7 +1062,7 @@ def active_deliverable_templates(roles: list[str]) -> dict[str, list[str]]:
 
 
 def packet_inputs_for_role(role: str, phase_context_targets: list[str]) -> list[str]:
-    shared = ["ultra-context.md", "context-bundle.md", "state.json"]
+    shared = ["phase-card.md", "ultra-context.md", "state.json"]
     role_specific = {
         "frontend-builder": ["implementation-plan.md", "design-direction.md", "active-context.md"],
         "backend-builder": ["implementation-plan.md", "tech-context.md", "active-context.md"],
@@ -1189,6 +1254,8 @@ def default_state(
         "role_contracts": role_contracts,
         "handoff_rules": list(HANDOFF_RULES),
         "phase_context_targets": phase_targets,
+        "doc_read_policy": doc_read_policy_for_phase(phase),
+        "doc_open_triggers": doc_open_triggers_for_phase(phase, project_type, capabilities),
         "cross_checks": cross_checks_for_project_type(project_type, secondary_archetypes, capabilities),
         "delegation_packets": delegation_packets_for_roles(active_roles, phase_targets, role_contracts, deliverable_templates),
         "user_overrides": {},
@@ -1348,6 +1415,11 @@ def merge_state_defaults(
 
     merged["token_mode"] = user_overrides.get("token_mode", merged.get("token_mode", "ultra"))
     merged["phase_context_targets"] = phase_context_targets(merged["phase"], merged["token_mode"])
+    merged["doc_read_policy"] = user_overrides.get("doc_read_policy", doc_read_policy_for_phase(merged["phase"]))
+    merged["doc_open_triggers"] = user_overrides.get(
+        "doc_open_triggers",
+        doc_open_triggers_for_phase(merged["phase"], merged["project_type"], merged["capabilities"]),
+    )
     merged["role_system_version"] = user_overrides.get("role_system_version", ROLE_SYSTEM_VERSION)
     merged["souls_version"] = user_overrides.get("souls_version", SOULS_VERSION)
     merged["project_dna"] = user_overrides.get("project_dna", project_dna_for_project_type(merged["project_type"], merged["capabilities"]))

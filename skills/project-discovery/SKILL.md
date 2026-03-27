@@ -22,6 +22,8 @@ description: Используй, когда нужно простыми вопр
 ## Вход
 
 - идея пользователя
+- `.codex-agent/phase-card.md`
+- `.codex-agent/ultra-context.md`
 - `.codex-agent/context-bundle.md`
 - `.codex-agent/state.json`
 

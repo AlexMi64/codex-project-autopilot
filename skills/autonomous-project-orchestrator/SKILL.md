@@ -41,6 +41,7 @@ description: Используй, когда нужно превратить ид
 
 ## Вход
 
+- `.codex-agent/phase-card.md`
 - `.codex-agent/ultra-context.md`
 - `.codex-agent/context-bundle.md`
 - `.codex-agent/state.json`
@@ -57,10 +58,12 @@ description: Используй, когда нужно превратить ид
 
 ## Правила токенов
 
-- всегда сначала читай `ultra-context.md`
-- открывай `context-bundle.md` только если ультра-контекста уже недостаточно
+- всегда сначала читай `phase-card.md`
+- `ultra-context.md` читай вторым
+- открывай `context-bundle.md` только если коротких файлов уже недостаточно
 - не перечитывай весь memory bank без причины
 - открывай полный knowledge pack только если он нужен активной подсистеме
+- открывай внешние docs только если это разрешают `doc_open_triggers`
 - если решение уже есть в `state.json`, не ищи его повторно
 - если план заморожен, не пересобирай стек, роли и packs без явной причины
 
