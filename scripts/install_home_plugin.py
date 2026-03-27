@@ -10,8 +10,8 @@ from pathlib import Path
 
 
 PLUGIN_NAME = "codex-project-autopilot"
-DEFAULT_MARKETPLACE_NAME = "morecil-local"
-DEFAULT_MARKETPLACE_DISPLAY_NAME = "Morecil Local Plugins"
+DEFAULT_MARKETPLACE_NAME = "local"
+DEFAULT_MARKETPLACE_DISPLAY_NAME = "Локальные плагины"
 
 
 def parse_args() -> argparse.Namespace:
@@ -115,9 +115,9 @@ def main() -> None:
     path = marketplace_path(home_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     marketplace = load_marketplace(path, args.marketplace_name, args.marketplace_display_name)
-    marketplace.setdefault("name", args.marketplace_name)
+    marketplace["name"] = args.marketplace_name
     marketplace.setdefault("interface", {})
-    marketplace["interface"].setdefault("displayName", args.marketplace_display_name)
+    marketplace["interface"]["displayName"] = args.marketplace_display_name
     marketplace = upsert_plugin(marketplace, plugin_entry())
     path.write_text(json.dumps(marketplace, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 

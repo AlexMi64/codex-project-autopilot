@@ -1,0 +1,37 @@
+{
+  "style_source": "[свой direction / внешний style-skill / бренд-гайд]",
+  "visual_intensity": "[спокойный / выразительный / очень смелый]",
+  "shape_language": "[строгий / редакционный / биоморфный / брутальный / футуристичный]",
+  "palette": {
+    "background": "[цвет]",
+    "foreground": "[цвет]",
+    "accent": "[цвет]",
+    "supporting": "[цвет]"
+  },
+  "typography": {
+    "display": "[шрифт]",
+    "body": "[шрифт]",
+    "language_support": "[кириллица / латиница / оба]",
+    "rules": [
+      "[правило]"
+    ]
+  },
+  "motion": {
+    "approach": "[что ощущается в движении]",
+    "interactions": [
+      "[движение]"
+    ]
+  },
+  "forms": {
+    "allow_complex_shapes": false,
+    "allowed_techniques": [
+      "[svg / clip-path / mask / layered gradients]"
+    ],
+    "forbidden_techniques": [
+      "[что ломает продукт]"
+    ]
+  },
+  "anti_template_rules": [
+    "[что нельзя делать по шаблону]"
+  ]
+}

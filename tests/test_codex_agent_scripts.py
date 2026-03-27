@@ -46,8 +46,11 @@ class CodexAgentScriptTests(unittest.TestCase):
             self.assertEqual(state["orchestration_mode"], "solo")
             self.assertEqual(state["selected_plan_variant"], "оптимально")
             self.assertEqual(state["beginner_explanation_mode"], "включен")
+            self.assertEqual(state["content_language"], "ru")
             self.assertEqual(state["role_system_version"], "morecil-role-system-v1")
             self.assertEqual(state["souls_version"], "morecil-souls-v1")
+            self.assertTrue(state["design_profile"])
+            self.assertIsInstance(state["style_inputs"], list)
             self.assertTrue(state["project_dna"])
             self.assertTrue(state["uniqueness_rules"])
             self.assertTrue(state["deliverable_templates"])
@@ -64,6 +67,7 @@ class CodexAgentScriptTests(unittest.TestCase):
             self.assertTrue((agent_dir / "ultra-context.md").exists())
             self.assertTrue((agent_dir / "plan-variants.md").exists())
             self.assertTrue((agent_dir / "beginner-guide.md").exists())
+            self.assertTrue((agent_dir / "design-system.json").exists())
             self.assertTrue((agent_dir / "approval-snapshot.json").exists())
             phase_card = (agent_dir / "phase-card.md").read_text(encoding="utf-8")
             self.assertIn("Прочитай этот файл первым.", phase_card)
@@ -72,6 +76,7 @@ class CodexAgentScriptTests(unittest.TestCase):
             self.assertIn("Soul system", ultra_context)
             context_bundle = (agent_dir / "context-bundle.md").read_text(encoding="utf-8")
             self.assertIn("Product DNA", context_bundle)
+            self.assertIn("Профиль дизайна", context_bundle)
             self.assertIn("Правила уникальности", context_bundle)
             self.assertIn("Открывай полные docs только если", context_bundle)
             self.assertNotIn("Правила handoff", context_bundle)
@@ -257,7 +262,7 @@ class CodexAgentScriptTests(unittest.TestCase):
             marketplace_path = workspace / ".agents" / "plugins" / "marketplace.json"
             self.assertTrue(marketplace_path.exists())
             marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
-            self.assertEqual(marketplace["name"], "morecil-local")
+            self.assertEqual(marketplace["name"], "local")
             self.assertEqual(marketplace["plugins"][0]["name"], "codex-project-autopilot")
             self.assertEqual(marketplace["plugins"][0]["category"], "Productivity")
             self.assertEqual(
@@ -295,8 +300,8 @@ class CodexAgentScriptTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
 
             marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
-            self.assertEqual(marketplace["name"], "custom-local")
-            self.assertEqual(marketplace["interface"]["displayName"], "Custom Local Plugins")
+            self.assertEqual(marketplace["name"], "local")
+            self.assertEqual(marketplace["interface"]["displayName"], "Локальные плагины")
             self.assertEqual(len(marketplace["plugins"]), 1)
             self.assertEqual(marketplace["plugins"][0]["source"]["path"], str(PLUGIN_ROOT))
 
@@ -313,7 +318,7 @@ class CodexAgentScriptTests(unittest.TestCase):
             marketplace = json.loads(
                 (home_root / ".agents" / "plugins" / "marketplace.json").read_text(encoding="utf-8")
             )
-            self.assertEqual(marketplace["name"], "morecil-local")
+            self.assertEqual(marketplace["name"], "local")
             self.assertEqual(marketplace["plugins"][0]["source"]["path"], "./plugins/codex-project-autopilot")
 
 

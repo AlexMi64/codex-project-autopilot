@@ -23,6 +23,7 @@ ARTIFACT_FILES = [
     "plan-variants.md",
     "beginner-guide.md",
     "project-brief.md",
+    "design-system.json",
     "product-intelligence.md",
     "product-context.md",
     "tech-context.md",
@@ -65,6 +66,7 @@ REQUIRED_STATE_KEYS = [
     "capabilities",
     "token_mode",
     "quality_mode",
+    "content_language",
     "goal",
     "audience",
     "plan_variants",
@@ -94,6 +96,8 @@ REQUIRED_STATE_KEYS = [
     "scope_guardrails",
     "role_system_version",
     "souls_version",
+    "design_profile",
+    "style_inputs",
     "project_dna",
     "uniqueness_rules",
     "deliverable_templates",
@@ -357,6 +361,7 @@ DELIVERABLE_TEMPLATES = {
     "deploy-operator": ["env checklist", "manual steps", "launch path", "residual risks"],
 }
 UNIQUENESS_RULES_BASE = [
+    "Не существует одного универсального шаблона, который подходит всем проектам.",
     "Не выбирай решение только потому, что оно дефолтное для библиотеки или фреймворка.",
     "Не повторяй один и тот же визуальный стиль во всех проектах.",
     "Не заполняй пробелы типичным SaaS-набором без продуктового обоснования.",
@@ -383,39 +388,48 @@ def project_dna_for_project_type(project_type: str, capabilities: list[str] | No
             "interface_energy": "выразительная, но собранная",
             "trust_signal": "структура, типографика, честный CTA",
             "uniqueness_axis": "редакционная композиция вместо типового лендинга",
+            "template_rejection": "не собирать сайт по дежурной схеме hero/features/testimonials/contact без причины",
         },
         "saas-mvp": {
             "core_promise": "дать пользователю один реально полезный рабочий сценарий",
             "interface_energy": "спокойная, инструментальная, но не безликая",
             "trust_signal": "понятные состояния, data clarity, ощущение контроля",
             "uniqueness_axis": "product-first UI вместо generic dashboard",
+            "template_rejection": "не прятать суть продукта за типовым кабинетом из одинаковых карточек",
         },
         "telegram-ai-bot": {
             "core_promise": "давать быстрый полезный ответ без хаоса в чате",
             "interface_energy": "компактная и направляющая",
             "trust_signal": "понятное меню, отсутствие спама, предсказуемые действия",
             "uniqueness_axis": "single-message flow вместо россыпи сообщений",
+            "template_rejection": "не имитировать богатый функционал десятками сообщений и лишними меню",
         },
         "automation-script": {
             "core_promise": "экономить рутину без превращения процесса в чёрный ящик",
             "interface_energy": "минимальная и служебная",
             "trust_signal": "dry-run, логи, предсказуемые side effects",
             "uniqueness_axis": "надёжность и объяснимость вместо магии",
+            "template_rejection": "не маскировать логику скрипта красивыми словами без прозрачного поведения",
         },
         "api-integration-worker": {
             "core_promise": "стабильно связывать системы и переживать сбои",
             "interface_energy": "техническая и прозрачная",
             "trust_signal": "контракты, retry, идемпотентность",
             "uniqueness_axis": "операционная устойчивость вместо красивой обёртки",
+            "template_rejection": "не превращать интеграцию в декоративный сервис без реальной устойчивости",
         },
         "general-web-product": {
             "core_promise": "довести пользователя до одной полезной цели без лишних подсистем",
             "interface_energy": "собранная и осмысленная",
             "trust_signal": "понятный маршрут, сильная структура, отсутствие лишнего",
             "uniqueness_axis": "характер и product fit вместо усреднённого web UI",
+            "template_rejection": "не собирать продукт из готовых паттернов без привязки к реальной задаче пользователя",
         },
     }
     dna = matrix.get(project_type, matrix["general-web-product"]).copy()
+    design_profile = design_profile_for_project_type(project_type, capabilities, [])
+    dna["visual_intensity"] = str(design_profile.get("visual_intensity", "сдержанный"))
+    dna["shape_language"] = str(design_profile.get("shape_language", "сдержанный"))
     if "ai" in capability_set:
         dna["ai_positioning"] = "AI не должен быть маской для шаблонности; он должен усиливать основной сценарий"
     if "payments" in capability_set:
@@ -449,6 +463,8 @@ def uniqueness_rules_for_project_type(project_type: str, capabilities: list[str]
         )
     if "ai" in capability_set:
         rules.append("Не используй AI как стилистическую отговорку для шаблонного продукта.")
+    if project_type in {"landing-page", "general-web-product"}:
+        rules.append("Смелость допустима только там, где она усиливает продукт; не делай все проекты нарочито креативными по умолчанию.")
     return dedupe(rules)
 
 
@@ -476,6 +492,104 @@ def read_template(name: str) -> str:
     return template_path(name).read_text(encoding="utf-8")
 
 
+def detect_local_style_inputs(workspace: Path) -> list[dict[str, str]]:
+    candidates: list[tuple[Path, str, str]] = [
+        (workspace / "skill.md", "project-style-skill", "Локальный style skill в корне проекта"),
+        (workspace / "SKILL.md", "project-style-skill", "Локальный style skill в корне проекта"),
+        (workspace / "design-system.json", "design-system", "Локальная дизайн-система проекта"),
+        (workspace / "brand-guide.md", "brand-guide", "Локальный бренд-гайд проекта"),
+        (workspace / "brand-guidelines.md", "brand-guide", "Локальный бренд-гайд проекта"),
+        (workspace / "moodboard.md", "moodboard", "Локальный moodboard проекта"),
+        (workspace / "references" / "brand-guide.md", "brand-guide", "Бренд-гайд в папке references"),
+        (workspace / "references" / "moodboard.md", "moodboard", "Moodboard в папке references"),
+        (workspace / "skills" / "design" / "SKILL.md", "style-skill", "Локальный дизайн-скилл проекта"),
+        (workspace / "skills" / "brand" / "SKILL.md", "style-skill", "Локальный бренд-скилл проекта"),
+        (workspace / "skills" / "neobrutalism" / "SKILL.md", "style-skill", "Локальный style-skill neobrutalism"),
+        (workspace / "skills" / "artistic" / "SKILL.md", "style-skill", "Локальный style-skill artistic"),
+        (workspace / "skills" / "bold" / "style.md", "style-skill", "Локальный style-skill bold"),
+        (workspace / "skills" / "bold" / "SKILL.md", "style-skill", "Локальный style-skill bold"),
+    ]
+    detected: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for path, kind, label in candidates:
+        if not path.exists():
+            continue
+        path_str = str(path)
+        if path_str in seen:
+            continue
+        seen.add(path_str)
+        detected.append({"type": kind, "path": path_str, "label": label})
+    return detected
+
+
+def design_profile_for_project_type(
+    project_type: str,
+    capabilities: list[str] | None = None,
+    style_inputs: list[dict[str, str]] | None = None,
+    content_language: str = "ru",
+) -> dict[str, Any]:
+    capability_set = set(capabilities or [])
+    has_external_style = bool(style_inputs)
+    profile: dict[str, Any] = {
+        "visual_intensity": "выразительный",
+        "composition_mode": "несимметричный, но контролируемый",
+        "shape_language": "сдержанный",
+        "allow_complex_shapes": False,
+        "allow_bold_art_direction": False,
+        "style_source_policy": "использовать внешние style-файлы как ориентир, а не как шаблон",
+        "font_policy": "подбирать шрифты под язык контента, а не только по красоте",
+    }
+
+    if project_type == "landing-page":
+        profile.update(
+            {
+                "visual_intensity": "выразительный",
+                "composition_mode": "асимметричный продуктовый постер",
+                "shape_language": "редакционный или органичный по ситуации",
+                "allow_complex_shapes": True,
+            }
+        )
+    elif project_type in {"saas-mvp", "general-web-product"}:
+        profile.update(
+            {
+                "visual_intensity": "сдержанный",
+                "composition_mode": "product-first с сильной иерархией",
+                "shape_language": "структурный, без визуального шума",
+            }
+        )
+    elif project_type == "telegram-ai-bot":
+        profile.update(
+            {
+                "visual_intensity": "спокойный",
+                "composition_mode": "компактный и утилитарный",
+                "shape_language": "минимальный",
+            }
+        )
+    elif project_type in {"automation-script", "api-integration-worker"}:
+        profile.update(
+            {
+                "visual_intensity": "спокойный",
+                "composition_mode": "служебный и объяснимый",
+                "shape_language": "минимальный",
+            }
+        )
+
+    if "marketing" in capability_set or project_type == "landing-page":
+        profile["allow_bold_art_direction"] = True
+    if has_external_style:
+        profile["style_input_detected"] = True
+        profile["allow_complex_shapes"] = profile["allow_complex_shapes"] or any(
+            "neobrutalism" in item.get("path", "").lower() or "artistic" in item.get("path", "").lower() or "bold" in item.get("path", "").lower()
+            for item in style_inputs or []
+        )
+    if content_language == "ru":
+        profile["font_support"] = "обязательна кириллица для display и body шрифтов"
+        profile["font_examples"] = "Manrope, Onest, Golos Text, IBM Plex Sans, Literata, Merriweather"
+    else:
+        profile["font_support"] = "латиница обязательна; декоративные гарнитуры допустимы только при нормальной читаемости"
+    return profile
+
+
 def load_knowledge_index() -> dict[str, Any]:
     return json.loads(KNOWLEDGE_INDEX_PATH.read_text(encoding="utf-8"))
 
@@ -492,6 +606,13 @@ def _project_match_scores(text: str) -> list[tuple[str, int]]:
         if score > 0:
             scores.append((project_type, score))
     return scores
+
+
+def infer_content_language(*parts: str) -> str:
+    text = " ".join(part for part in parts if part)
+    if any("\u0400" <= char <= "\u04FF" for char in text):
+        return "ru"
+    return "en"
 
 
 def infer_project_profile(
@@ -1200,6 +1321,7 @@ def default_approval_snapshot(workspace: Path) -> dict[str, Any]:
 
 
 def default_state(
+    workspace: Path,
     project_type: str,
     secondary_archetypes: list[str],
     capabilities: list[str],
@@ -1208,6 +1330,8 @@ def default_state(
     phase: str,
 ) -> dict[str, Any]:
     token_mode = "ultra"
+    content_language = infer_content_language(goal, audience)
+    style_inputs = detect_local_style_inputs(workspace)
     selected_packs = select_pack_ids(project_type, phase, secondary_archetypes, capabilities)
     active_roles = roles_for_project_profile(project_type, secondary_archetypes, capabilities)
     role_contracts = active_role_contracts(active_roles)
@@ -1220,6 +1344,7 @@ def default_state(
         "capabilities": capabilities,
         "token_mode": token_mode,
         "quality_mode": "сбалансированно",
+        "content_language": content_language,
         "goal": goal,
         "audience": audience,
         "plan_variants": default_plan_variants(project_type, capabilities),
@@ -1248,6 +1373,8 @@ def default_state(
         "scope_guardrails": scope_guardrails_for_project_type(project_type, capabilities),
         "role_system_version": ROLE_SYSTEM_VERSION,
         "souls_version": SOULS_VERSION,
+        "design_profile": design_profile_for_project_type(project_type, capabilities, style_inputs, content_language),
+        "style_inputs": style_inputs,
         "project_dna": project_dna_for_project_type(project_type, capabilities),
         "uniqueness_rules": uniqueness_rules_for_project_type(project_type, capabilities),
         "deliverable_templates": deliverable_templates,
@@ -1262,7 +1389,7 @@ def default_state(
         "tasks": default_tasks(project_type, phase),
         "blocked_on_user": False,
         "manual_inputs": [],
-        "artifacts": artifact_paths(Path(".")),
+        "artifacts": artifact_paths(workspace),
     }
     return state
 
@@ -1340,9 +1467,11 @@ def merge_state_defaults(
     resolved_phase = phase or state.get("phase", "discovery")
     resolved_goal = goal or state.get("goal", "")
     resolved_audience = audience or state.get("audience", "")
+    resolved_content_language = infer_content_language(resolved_goal, resolved_audience)
 
     merged = {
         **default_state(
+            workspace,
             resolved_project_type,
             resolved_secondary,
             resolved_capabilities,
@@ -1396,6 +1525,7 @@ def merge_state_defaults(
         "execution_strategy": execution_strategy_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
         "orchestration_mode": orchestration_mode_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
         "quality_mode": merged.get("quality_mode", "сбалансированно"),
+        "content_language": merged.get("content_language", resolved_content_language),
         "scope_mode": scope_mode_for_project_type(merged["project_type"], merged.get("quality_mode", "сбалансированно")),
         "recommendation_policy": recommendation_policy_for_project_type(merged["project_type"]),
         "scope_guardrails": scope_guardrails_for_project_type(merged["project_type"], merged["capabilities"]),
@@ -1422,6 +1552,17 @@ def merge_state_defaults(
     )
     merged["role_system_version"] = user_overrides.get("role_system_version", ROLE_SYSTEM_VERSION)
     merged["souls_version"] = user_overrides.get("souls_version", SOULS_VERSION)
+    detected_style_inputs = detect_local_style_inputs(workspace)
+    merged["style_inputs"] = user_overrides.get("style_inputs", detected_style_inputs)
+    merged["design_profile"] = user_overrides.get(
+        "design_profile",
+        design_profile_for_project_type(
+            merged["project_type"],
+            merged["capabilities"],
+            merged["style_inputs"],
+            merged.get("content_language", resolved_content_language),
+        ),
+    )
     merged["project_dna"] = user_overrides.get("project_dna", project_dna_for_project_type(merged["project_type"], merged["capabilities"]))
     merged["uniqueness_rules"] = user_overrides.get("uniqueness_rules", uniqueness_rules_for_project_type(merged["project_type"], merged["capabilities"]))
     merged["deliverable_templates"] = user_overrides.get("deliverable_templates", active_deliverable_templates(merged["active_roles"]))

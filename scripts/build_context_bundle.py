@@ -170,6 +170,7 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
         "## Проект",
         "",
         f"- Цель: {state.get('goal') or '[не задана]'}",
+        f"- Язык контента: `{state.get('content_language', 'unknown')}`",
         f"- Архетип: `{state.get('project_type', 'unknown')}`",
         f"- Capabilities: `{', '.join(state.get('capabilities', [])) or 'нет'}`",
         f"- Маршрут реализации: `{state.get('playbook', '')}`",
@@ -179,11 +180,26 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
     ]
 
     if phase in {"discovery", "planning", "approval"}:
+        style_input_lines = limited_lines(
+            [
+                f"- {item.get('type')}: {item.get('label')} ({item.get('path')})"
+                for item in state.get("style_inputs", [])
+            ],
+            3,
+        ) or ["- нет внешних style-inputs"]
         sections.extend(
             [
                 "## Product DNA",
                 "",
                 *limited_lines([f"- {key}: {value}" for key, value in state.get("project_dna", {}).items()], 3),
+                "",
+                "## Профиль дизайна",
+                "",
+                *limited_lines([f"- {key}: {value}" for key, value in state.get("design_profile", {}).items()], 4),
+                "",
+                "## Источники стиля",
+                "",
+                *style_input_lines,
                 "",
                 "## Правила уникальности",
                 "",

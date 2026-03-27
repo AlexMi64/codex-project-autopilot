@@ -69,6 +69,8 @@ def validate(workspace: Path, require_finalization: bool) -> list[str]:
         issues.append("selected_plan_variant должен совпадать с одним из id в plan_variants")
     if not isinstance(state.get("beginner_explanation_mode"), str) or not state.get("beginner_explanation_mode"):
         issues.append("В state.json должен быть непустой beginner_explanation_mode")
+    if not isinstance(state.get("content_language"), str) or not state.get("content_language"):
+        issues.append("В state.json должен быть непустой content_language")
     if not isinstance(state.get("user_overrides"), dict):
         issues.append("В state.json должен быть объект user_overrides")
 
@@ -106,6 +108,10 @@ def validate(workspace: Path, require_finalization: bool) -> list[str]:
         issues.append("В state.json должен быть непустой role_system_version")
     if not isinstance(state.get("souls_version"), str) or not state.get("souls_version"):
         issues.append("В state.json должен быть непустой souls_version")
+    if not isinstance(state.get("design_profile"), dict) or not state.get("design_profile"):
+        issues.append("В state.json должен быть непустой объект design_profile")
+    if not isinstance(state.get("style_inputs"), list):
+        issues.append("В state.json должен быть список style_inputs")
     if not isinstance(state.get("project_dna"), dict) or not state.get("project_dna"):
         issues.append("В state.json должен быть непустой объект project_dna")
     if not isinstance(state.get("uniqueness_rules"), list) or not state.get("uniqueness_rules"):
