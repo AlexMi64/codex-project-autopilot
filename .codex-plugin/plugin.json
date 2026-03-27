@@ -1,6 +1,6 @@
 {
   "name": "codex-project-autopilot",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Локальный плагин Codex, который превращает идею сайта, бота, SaaS MVP или автоматизации в понятный план, маршрут реализации, проверку и финальный handoff.",
   "author": {
     "name": "Morecil",
