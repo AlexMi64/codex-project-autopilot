@@ -12,6 +12,8 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 INIT_SCRIPT = PLUGIN_ROOT / "scripts" / "init_codex_agent.py"
 VALIDATE_SCRIPT = PLUGIN_ROOT / "scripts" / "validate_codex_agent.py"
 TRANSITION_SCRIPT = PLUGIN_ROOT / "scripts" / "transition_codex_agent_phase.py"
+INSTALL_SCRIPT = PLUGIN_ROOT / "scripts" / "install_local_plugin.py"
+HOME_INSTALL_SCRIPT = PLUGIN_ROOT / "scripts" / "install_home_plugin.py"
 
 
 class CodexAgentScriptTests(unittest.TestCase):
@@ -217,6 +219,74 @@ class CodexAgentScriptTests(unittest.TestCase):
                 "--require-finalization",
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_install_script_creates_marketplace_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp)
+            result = self.run_script(INSTALL_SCRIPT, "--workspace", str(workspace))
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            marketplace_path = workspace / ".agents" / "plugins" / "marketplace.json"
+            self.assertTrue(marketplace_path.exists())
+            marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
+            self.assertEqual(marketplace["name"], "morecil-local")
+            self.assertEqual(marketplace["plugins"][0]["name"], "codex-project-autopilot")
+            self.assertEqual(marketplace["plugins"][0]["category"], "Productivity")
+            self.assertEqual(
+                marketplace["plugins"][0]["source"]["path"],
+                str(PLUGIN_ROOT),
+            )
+
+    def test_install_script_updates_existing_marketplace_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp)
+            marketplace_path = workspace / ".agents" / "plugins" / "marketplace.json"
+            marketplace_path.parent.mkdir(parents=True, exist_ok=True)
+            marketplace_path.write_text(
+                json.dumps(
+                    {
+                        "name": "custom-local",
+                        "interface": {"displayName": "Custom Local Plugins"},
+                        "plugins": [
+                            {
+                                "name": "codex-project-autopilot",
+                                "source": {"source": "local", "path": "/old/path"},
+                                "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+                                "category": "Productivity",
+                            }
+                        ],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script(INSTALL_SCRIPT, "--workspace", str(workspace))
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
+            self.assertEqual(marketplace["name"], "custom-local")
+            self.assertEqual(marketplace["interface"]["displayName"], "Custom Local Plugins")
+            self.assertEqual(len(marketplace["plugins"]), 1)
+            self.assertEqual(marketplace["plugins"][0]["source"]["path"], str(PLUGIN_ROOT))
+
+    def test_home_install_script_copies_plugin_and_creates_user_marketplace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            home_root = Path(tmp)
+            result = self.run_script(HOME_INSTALL_SCRIPT, "--home-root", str(home_root))
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            installed_plugin = home_root / "plugins" / "codex-project-autopilot"
+            self.assertTrue(installed_plugin.exists())
+            self.assertTrue((installed_plugin / ".codex-plugin" / "plugin.json").exists())
+
+            marketplace = json.loads(
+                (home_root / ".agents" / "plugins" / "marketplace.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(marketplace["name"], "morecil-local")
+            self.assertEqual(marketplace["plugins"][0]["source"]["path"], "./plugins/codex-project-autopilot")
 
 
 if __name__ == "__main__":
