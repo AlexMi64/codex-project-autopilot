@@ -94,6 +94,18 @@ def validate(workspace: Path, require_finalization: bool) -> list[str]:
         issues.append("В state.json должен быть непустой recommendation_policy")
     if not isinstance(state.get("scope_guardrails"), list) or not state.get("scope_guardrails"):
         issues.append("В state.json должен быть непустой список scope_guardrails")
+    if not isinstance(state.get("orchestration_mode"), str) or state.get("orchestration_mode") not in {"solo", "delegated"}:
+        issues.append("В state.json orchestration_mode должен быть 'solo' или 'delegated'")
+    if not isinstance(state.get("delegation_policy"), dict) or not state.get("delegation_policy"):
+        issues.append("В state.json должен быть непустой объект delegation_policy")
+    if not isinstance(state.get("delegation_targets"), list):
+        issues.append("В state.json должен быть список delegation_targets")
+    if not isinstance(state.get("role_system_version"), str) or not state.get("role_system_version"):
+        issues.append("В state.json должен быть непустой role_system_version")
+    if not isinstance(state.get("role_contracts"), dict) or not state.get("role_contracts"):
+        issues.append("В state.json должен быть непустой объект role_contracts")
+    if not isinstance(state.get("handoff_rules"), list) or not state.get("handoff_rules"):
+        issues.append("В state.json должен быть непустой список handoff_rules")
     if not isinstance(state.get("cross_checks"), list) or not state.get("cross_checks"):
         issues.append("В state.json должен быть непустой список cross_checks")
     if not isinstance(state.get("tasks"), list) or not state.get("tasks"):

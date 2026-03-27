@@ -49,6 +49,16 @@ def build_role_contract_lines(state: dict) -> list[str]:
     return lines
 
 
+def build_delegation_target_lines(state: dict) -> list[str]:
+    lines: list[str] = []
+    for target in state.get("delegation_targets", []):
+        role = target.get("role", "unknown")
+        ownership = target.get("ownership", "")
+        spawn_when = target.get("spawn_when", "")
+        lines.append(f"- `{role}`: зона = {ownership}; запускать, когда {spawn_when.lower()}")
+    return lines
+
+
 def build_ultra_context(state: dict) -> str:
     next_task = next((task for task in state.get("tasks", []) if task.get("status") == "in_progress"), None)
     blockers = "да" if state.get("blocked_on_user") else "нет"
@@ -62,6 +72,7 @@ def build_ultra_context(state: dict) -> str:
         f"- Основной архетип: `{state.get('project_type', 'unknown')}`",
         f"- Вторичные архетипы: `{', '.join(state.get('secondary_archetypes', [])) or 'нет'}`",
         f"- Capabilities: `{', '.join(state.get('capabilities', [])) or 'нет'}`",
+        f"- Режим оркестрации: `{state.get('orchestration_mode', 'solo')}`",
         f"- План заморожен: `{'да' if state.get('approval_snapshot', {}).get('locked') else 'нет'}`",
         f"- Выбранный вариант плана: `{state.get('selected_plan_variant', 'оптимально')}`",
         f"- Режим объяснений: `{state.get('beginner_explanation_mode', 'включен')}`",
@@ -80,6 +91,7 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
         if task.get("status") != "done"
     ]
     role_contract_lines = build_role_contract_lines(state)
+    delegation_target_lines = build_delegation_target_lines(state)
 
     bundle = "\n".join(
         [
@@ -96,6 +108,7 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
             f"- Фаза: `{state.get('phase', 'unknown')}`",
             f"- Режим токенов: `{state.get('token_mode', 'ultra')}`",
             f"- Режим качества: `{state.get('quality_mode', 'сбалансированно')}`",
+            f"- Режим оркестрации: `{state.get('orchestration_mode', 'solo')}`",
             f"- План заморожен: `{'да' if state.get('approval_snapshot', {}).get('locked') else 'нет'}`",
             f"- Выбранный вариант плана: `{state.get('selected_plan_variant', 'оптимально')}`",
             f"- Режим объяснений: `{state.get('beginner_explanation_mode', 'включен')}`",
@@ -114,6 +127,15 @@ def build_context_bundle(state: dict, selected_pack_lines: list[str]) -> str:
             "## Короткие контракты ролей",
             "",
             *(role_contract_lines or ["- контракты ролей не описаны"]),
+            "",
+            "## Делегирование",
+            "",
+            f"- Активный режим: `{state.get('orchestration_mode', 'solo')}`",
+            *[
+                f"- {item}"
+                for item in state.get("delegation_policy", {}).get(state.get("orchestration_mode", "solo"), {}).get("guardrails", [])
+            ],
+            *(["", "### Возможные цели делегирования", ""] + delegation_target_lines if delegation_target_lines else []),
             "",
             "## Рекомендуемые skills",
             "",

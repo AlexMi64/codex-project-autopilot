@@ -43,6 +43,7 @@ class CodexAgentScriptTests(unittest.TestCase):
             self.assertEqual(state["project_type"], "telegram-ai-bot")
             self.assertEqual(state["selected_stack"]["bot_framework"], "Telegraf")
             self.assertEqual(state["token_mode"], "ultra")
+            self.assertEqual(state["orchestration_mode"], "solo")
             self.assertEqual(state["selected_plan_variant"], "оптимально")
             self.assertEqual(state["beginner_explanation_mode"], "включен")
             self.assertEqual(state["role_system_version"], "morecil-role-system-v1")
@@ -78,6 +79,9 @@ class CodexAgentScriptTests(unittest.TestCase):
             self.assertIn("saas-mvp", state["secondary_archetypes"])
             self.assertIn("dashboard", state["capabilities"])
             self.assertIn("auth", state["capabilities"])
+            self.assertEqual(state["orchestration_mode"], "delegated")
+            self.assertTrue(any(item.get("role") == "frontend-builder" for item in state["delegation_targets"]))
+            self.assertTrue(any(item.get("role") == "backend-builder" for item in state["delegation_targets"]))
             self.assertIn("frontend-builder", state["active_roles"])
             self.assertIn("./playbooks/saas-mvp.md", state["supporting_playbooks"])
 

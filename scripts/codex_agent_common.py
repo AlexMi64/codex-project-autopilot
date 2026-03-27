@@ -50,6 +50,9 @@ PLAN_LOCK_FIELDS = [
     "quality_gates",
     "verification_required",
     "execution_strategy",
+    "orchestration_mode",
+    "delegation_policy",
+    "delegation_targets",
     "quality_mode",
 ]
 REQUIRED_STATE_KEYS = [
@@ -79,6 +82,9 @@ REQUIRED_STATE_KEYS = [
     "approval_status",
     "approval_snapshot",
     "execution_strategy",
+    "orchestration_mode",
+    "delegation_policy",
+    "delegation_targets",
     "scope_mode",
     "recommendation_policy",
     "scope_guardrails",
@@ -302,6 +308,33 @@ HANDOFF_RULES = [
     "Следующей роли нужно явно назвать 1-3 файла-источника истины, а не отправлять её 'читать всё'.",
     "Если роль не выполнила done criteria, оркестратор возвращает работу на доработку, а не двигается дальше.",
 ]
+DELEGATION_POLICY = {
+    "solo": {
+        "summary": "Один агент ведёт проект последовательно по ролям без запуска под-агентов.",
+        "when_to_use": [
+            "Короткий или средний проект.",
+            "Нет явной пользы от параллельной работы.",
+            "Критичный путь требует плотной связки решений.",
+        ],
+        "guardrails": [
+            "Не дроби работу ради видимости многозадачности.",
+            "Держи контекст компактным и не пересылай всё каждой роли заново.",
+        ],
+    },
+    "delegated": {
+        "summary": "Оркестратор может запускать отдельные под-агенты для независимых ролей и интегрировать результат обратно.",
+        "when_to_use": [
+            "Есть хотя бы две независимые подсистемы.",
+            "Фронтенд, бэкенд, data или verification можно вести параллельно.",
+            "Следующий шаг не блокируется полностью одной ролью.",
+        ],
+        "guardrails": [
+            "Не делегируй discovery и final handoff как фоновый шум — это ответственность оркестратора.",
+            "Не делегируй блокирующую задачу, если без неё нельзя сделать следующий шаг локально.",
+            "Каждому под-агенту нужен чёткий write scope и формат handoff.",
+        ],
+    },
+}
 
 
 def dedupe(items: list[str]) -> list[str]:
@@ -574,6 +607,74 @@ def execution_strategy_for_project_type(project_type: str, secondary_archetypes:
     if "payments" in set(capabilities or []) or "auth" in set(capabilities or []):
         return "последовательные-роли-с-guardrails-на-доступ-и-данные"
     return "последовательные-роли-с-дизайн-и-smoke-gates"
+
+
+def orchestration_mode_for_project_type(project_type: str, secondary_archetypes: list[str] | None = None, capabilities: list[str] | None = None) -> str:
+    capability_set = set(capabilities or [])
+    if secondary_archetypes:
+        return "delegated"
+    if len(capability_set.intersection({"dashboard", "database", "auth", "automation", "api"})) >= 2:
+        return "delegated"
+    if project_type in {"saas-mvp", "api-integration-worker"} and len(capability_set) >= 2:
+        return "delegated"
+    return "solo"
+
+
+def delegation_targets_for_project_type(project_type: str, secondary_archetypes: list[str] | None = None, capabilities: list[str] | None = None) -> list[dict[str, str]]:
+    targets: list[dict[str, str]] = []
+    capability_set = set(capabilities or [])
+    if project_type in {"landing-page", "general-web-product", "saas-mvp"} or "dashboard" in capability_set:
+        targets.append(
+            {
+                "role": "frontend-builder",
+                "ownership": "UI, states, responsive behavior, design implementation",
+                "spawn_when": "Когда backend-контракты уже понятны и UI можно собирать независимо.",
+            }
+        )
+    if project_type in {"saas-mvp", "telegram-ai-bot", "api-integration-worker"} or {"api", "telegram"} & capability_set:
+        targets.append(
+            {
+                "role": "backend-builder",
+                "ownership": "API, handlers, webhook logic, integrations, validation, logs",
+                "spawn_when": "Когда продуктовый маршрут уже заморожен и нужен отдельный server-side поток работы.",
+            }
+        )
+    if "database" in capability_set or "auth" in capability_set or "payments" in capability_set:
+        targets.append(
+            {
+                "role": "database-designer",
+                "ownership": "schema, ownership, access model, migrations, data constraints",
+                "spawn_when": "Когда durable state действительно нужен и можно отдельно спроектировать data layer.",
+            }
+        )
+    if project_type == "automation-script" or "automation" in capability_set:
+        targets.append(
+            {
+                "role": "automation-builder",
+                "ownership": "scripts, workers, dry-run, retries, safe side effects",
+                "spawn_when": "Когда automation pipeline можно строить отдельно от UI.",
+            }
+        )
+    targets.append(
+        {
+            "role": "qa-reviewer",
+            "ownership": "findings, verification report, scorecard, release readiness",
+            "spawn_when": "Когда реализация уже есть и review может идти параллельно с финальным полишем.",
+        }
+    )
+    return dedupe_targets(targets)
+
+
+def dedupe_targets(targets: list[dict[str, str]]) -> list[dict[str, str]]:
+    seen: set[str] = set()
+    ordered: list[dict[str, str]] = []
+    for target in targets:
+        role = target.get("role")
+        if not role or role in seen:
+            continue
+        seen.add(role)
+        ordered.append(target)
+    return ordered
 
 
 def scope_mode_for_project_type(project_type: str, quality_mode: str = "сбалансированно") -> str:
@@ -909,6 +1010,9 @@ def default_state(
         "approval_status": "pending" if phase in {"discovery", "planning", "approval"} else "approved",
         "approval_snapshot": default_approval_snapshot(Path(".")),
         "execution_strategy": execution_strategy_for_project_type(project_type, secondary_archetypes, capabilities),
+        "orchestration_mode": orchestration_mode_for_project_type(project_type, secondary_archetypes, capabilities),
+        "delegation_policy": DELEGATION_POLICY,
+        "delegation_targets": delegation_targets_for_project_type(project_type, secondary_archetypes, capabilities),
         "scope_mode": scope_mode_for_project_type(project_type),
         "recommendation_policy": recommendation_policy_for_project_type(project_type),
         "scope_guardrails": scope_guardrails_for_project_type(project_type, capabilities),
@@ -1053,6 +1157,7 @@ def merge_state_defaults(
         "quality_gates": quality_gates_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
         "verification_required": verification_required_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
         "execution_strategy": execution_strategy_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
+        "orchestration_mode": orchestration_mode_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
         "quality_mode": merged.get("quality_mode", "сбалансированно"),
         "scope_mode": scope_mode_for_project_type(merged["project_type"], merged.get("quality_mode", "сбалансированно")),
         "recommendation_policy": recommendation_policy_for_project_type(merged["project_type"]),
@@ -1076,6 +1181,11 @@ def merge_state_defaults(
     merged["role_system_version"] = user_overrides.get("role_system_version", ROLE_SYSTEM_VERSION)
     merged["role_contracts"] = user_overrides.get("role_contracts", active_role_contracts(merged["active_roles"]))
     merged["handoff_rules"] = user_overrides.get("handoff_rules", list(HANDOFF_RULES))
+    merged["delegation_policy"] = user_overrides.get("delegation_policy", DELEGATION_POLICY)
+    merged["delegation_targets"] = user_overrides.get(
+        "delegation_targets",
+        delegation_targets_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
+    )
     merged["cross_checks"] = user_overrides.get(
         "cross_checks",
         cross_checks_for_project_type(merged["project_type"], merged["secondary_archetypes"], merged["capabilities"]),
